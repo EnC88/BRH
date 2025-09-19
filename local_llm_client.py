@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 class LocalLLMClient:
-    def __init__(self, model: str = "qwen2.5:7b", base_url: str = "http://localhost:11434"):
+    def __init__(self, model: str = "tinyllama", base_url: str = "http://localhost:11434"):
         self.model = model
         self.base_url = base_url
         self.api_url = f"{base_url}/api/generate"
@@ -59,8 +59,6 @@ class LocalLLMClient:
 
 def main():
     client = LocalLLMClient()
-    
-    print("Local LLM Client for M2 MacBook")
     print("Type 'quit' or 'exit' to stop")
     
     while True:
