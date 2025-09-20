@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import { initializeApp } from 'firebase/app';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { initializeApp } from "firebase/app";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getAuth } from "firebase/auth";
+import { getFirestore, doc, updateDoc, arrayUnion } from "firebase/firestore";
 
 export default function CameraPage() {
   const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -13,18 +13,18 @@ export default function CameraPage() {
   const [isLoading3D, setIsLoading3D] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [description, setDescription] = useState("");
 
-  // Firebase configuration
   const firebaseConfig = {
     apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
     authDomain: "brh2025-4b271.firebaseapp.com",
     projectId: "brh2025-4b271",
     storageBucket: "brh2025-4b271.firebasestorage.app",
     messagingSenderId: "858895632224",
-    appId: "1:858895632224:web:3c09a5d9b77c9da0438005"
+    appId: "1:858895632224:web:3c09a5d9b77c9da0438005",
   };
 
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const storage = getStorage(app);
   const auth = getAuth(app);
@@ -35,6 +35,8 @@ export default function CameraPage() {
   const streamRef = useRef(null);
   const threeContainerRef = useRef(null);
   const rafRef = useRef(null);
+  const eventHandlersRef = useRef({});
+
   const stopCamera = () => {
     try {
       if (streamRef.current) {
@@ -42,11 +44,38 @@ export default function CameraPage() {
         streamRef.current = null;
       }
       if (videoRef.current) {
-        try { videoRef.current.pause(); } catch {}
+        try {
+          videoRef.current.pause();
+        } catch {}
         videoRef.current.srcObject = null;
       }
     } catch (e) {
-      console.warn('stopCamera error', e);
+      console.warn("stopCamera error", e);
+    }
+  };
+
+  const cleanupThree = () => {
+    try {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      const { handleMouseMove, handleTouchMove, handleResize } =
+        eventHandlersRef.current;
+      const container = threeContainerRef.current;
+
+      if (container) {
+        if (handleMouseMove)
+          container.removeEventListener("mousemove", handleMouseMove);
+        if (handleTouchMove)
+          container.removeEventListener("touchmove", handleTouchMove);
+      }
+      if (handleResize) window.removeEventListener("resize", handleResize);
+
+      eventHandlersRef.current = {};
+      if (container) container.innerHTML = "";
+    } catch (e) {
+      console.warn("cleanupThree error", e);
     }
   };
 
@@ -55,8 +84,17 @@ export default function CameraPage() {
       stopCamera();
       cleanupThree();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    if (show3DScene) {
+      document.body.style.overflow = "auto";
+    }
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [show3DScene]);
 
   useEffect(() => {
     let active = true;
@@ -64,13 +102,12 @@ export default function CameraPage() {
       stopCamera();
       return;
     }
-
     (async () => {
       try {
         stopCamera();
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'user',
+            facingMode: "user",
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
@@ -80,157 +117,144 @@ export default function CameraPage() {
           return;
         }
         streamRef.current = stream;
-
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.onloadedmetadata = async () => {
             try {
               await videoRef.current.play();
             } catch (err) {
-              console.error('Video play error:', err);
+              console.error("Video play error:", err);
             }
           };
         }
       } catch (err) {
-        console.error('Camera error:', err);
+        console.error("Camera error:", err);
         stopCamera();
       }
     })();
-
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [showCamera]);
-
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-
+    const ctx = canvas.getContext("2d");
     if (!video.videoWidth || !video.videoHeight) return;
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const dataUrl = canvas.toDataURL('image/jpeg');
+    const dataUrl = canvas.toDataURL("image/jpeg");
     setCapturedPhoto(dataUrl);
     setShowCamera(false);
     setShow3DScene(true);
     stopCamera();
   };
 
-  // Function to convert data URL to File object (same as in storing_photos.js)
+  const retakePhoto = () => {
+    cleanupThree();
+    setCapturedPhoto(null);
+    setShow3DScene(false);
+    setIsLoading3D(false);
+    setShowCamera(true);
+    setDescription("");
+    setUploadSuccess(false);
+  };
+
   const dataURLtoFile = (dataurl, filename) => {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
+    const arr = dataurl.split(","),
+      mime = arr[0].match(/:(.*?);/)[1];
     const bstr = atob(arr[1]);
     let n = bstr.length;
     const u8arr = new Uint8Array(n);
-    while(n--){
+    while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    return new File([u8arr], filename, {type:mime});
+    return new File([u8arr], filename, { type: mime });
   };
 
-  // Function to upload photo to Firebase
-  const uploadPhotoToFirebase = async (dataUrl, caption = '', tags = []) => {
+  const uploadPhotoToFirebase = async (
+    dataUrl,
+    description = "",
+    tags = []
+  ) => {
     setIsUploading(true);
-    
     try {
-      // Check if user is authenticated
       const user = auth.currentUser;
       if (!user) {
-        throw new Error('Please sign in to upload photos');
+        throw new Error("Please sign in to upload photos");
       }
-
-      // Convert data URL to File
       const file = dataURLtoFile(dataUrl, `photo_${Date.now()}.jpg`);
-      
-      // Create storage reference
       const storageRef = ref(storage, `uploads/${file.name}`);
-      
-      // Upload file to Firebase Storage
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      // Save photo metadata to Firestore
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
-        photos: arrayUnion({
+        posts: arrayUnion({
           url: downloadURL,
-          caption: caption,
-          tags: tags,
+          description,
+          tags,
           timestamp: new Date().toISOString(),
-          filename: file.name
-        })
+          filename: file.name,
+          userId: user.uid,
+        }),
       });
-      
-      return {
-        success: true,
-        downloadURL: downloadURL,
-        filename: file.name
-      };
+      return { success: true, downloadURL, filename: file.name };
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error("Upload failed:", error);
       throw error;
     } finally {
       setIsUploading(false);
     }
   };
 
-  const closeCamera = () => {
-    stopCamera();
-    window.location.href = '/';
-  };
-
-  const cleanupThree = () => {
+  const handleUpload = async () => {
+    if (uploadSuccess) return;
     try {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      document.removeEventListener('mousemove', () => {});
-      document.removeEventListener('touchmove', () => {});
-      window.removeEventListener('resize', () => {});
-      const container = threeContainerRef.current;
-      if (container) container.innerHTML = '';
-    } catch (e) {
-      console.warn('cleanupThree error', e);
+      await uploadPhotoToFirebase(capturedPhoto, description, ["#camera"]);
+      setUploadSuccess(true);
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
+    } catch (error) {
+      alert(`Upload failed: ${error.message}`);
     }
   };
 
-  const resetPhoto = () => {
+  const closeCamera = () => {
+    stopCamera();
+    window.location.href = "/";
+  };
+  const deletePhoto = () => {
     cleanupThree();
     setCapturedPhoto(null);
     setShow3DScene(false);
     setIsLoading3D(false);
-    setShowCamera(true);
-  };
-
-  const create3DScene = async (photoDataUrl, container) => {
-    if (!container) {
-      setIsLoading3D(false);
-      setShow3DScene(false);
-      return;
-    }
-    await createScene(container, photoDataUrl);
+    setDescription("");
+    window.location.href = "/";
   };
 
   const createScene = async (container, photoDataUrl) => {
-    container.innerHTML = '';
-
+    container.innerHTML = "";
     try {
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        container.clientWidth / container.clientHeight,
+        0.1,
+        1000
+      );
       camera.position.set(0, 0, 50);
-
-      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        preserveDrawingBuffer: true,
+      });
+      renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.toneMapping = THREE.NoToneMapping;
       renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
       container.appendChild(renderer.domElement);
-
       const loader = new THREE.TextureLoader();
       const texture = await new Promise((resolve, reject) => {
         loader.load(photoDataUrl, resolve, undefined, reject);
@@ -239,85 +263,78 @@ export default function CameraPage() {
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = false;
       const aspect = texture.image.width / texture.image.height;
-      const width = 200;
-      const height = width / aspect;
-      const widthSegments = 32;
-      const heightSegments = 16;
-      const curveIntensity = 0.7;
-
-      const geometry = new THREE.PlaneGeometry(width, height, widthSegments, heightSegments);
+      const width = 200,
+        height = width / aspect;
+      const widthSegments = 32,
+        heightSegments = 16,
+        curveIntensity = 0.7;
+      const geometry = new THREE.PlaneGeometry(
+        width,
+        height,
+        widthSegments,
+        heightSegments
+      );
       const positions = geometry.attributes.position;
-
       for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i);
-        const y = positions.getY(i);
-        const z = positions.getZ(i);
-
+        const x = positions.getX(i),
+          y = positions.getY(i),
+          z = positions.getZ(i);
         const distanceFromCenter = Math.sqrt(x * x + y * y);
-        const maxDistance = Math.sqrt((width / 2) * (width / 2) + (height / 2) * (height / 2));
+        const maxDistance = Math.sqrt((width / 2) ** 2 + (height / 2) ** 2);
         const normalizedDistance = distanceFromCenter / maxDistance;
-
-        const newZ = z + (normalizedDistance * normalizedDistance * curveIntensity * 20);
+        const newZ = z + normalizedDistance ** 2 * curveIntensity * 20;
         positions.setZ(i, newZ);
       }
       positions.needsUpdate = true;
-
       const material = new THREE.MeshBasicMaterial({
         map: texture,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
       });
-
       const plane = new THREE.Mesh(geometry, material);
-      plane.position.set(0, 0, 0);
       scene.add(plane);
+      scene.background = new THREE.Color(0x1a4d3a);
+      let mouseX = 0,
+        mouseY = 0;
 
-      scene.background = new THREE.Color(0x000000);
-
-      let mouseX = 0, mouseY = 0;
-      
       const handleMouseMove = (e) => {
-        mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-        mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+        const rect = container.getBoundingClientRect();
+        mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       };
-
       const handleTouchMove = (e) => {
-        e.preventDefault();
         const touch = e.touches[0];
-        mouseX = (touch.clientX / window.innerWidth) * 2 - 1;
-        mouseY = (touch.clientY / window.innerHeight) * 2 - 1;
+        const rect = container.getBoundingClientRect();
+        mouseX = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+        mouseY = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
       };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('touchmove', handleTouchMove, { passive: false });
-
       const handleResize = () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(container.clientWidth, container.clientHeight);
       };
 
-      window.addEventListener('resize', handleResize);
+      eventHandlersRef.current = {
+        handleMouseMove,
+        handleTouchMove,
+        handleResize,
+      };
+      container.addEventListener("mousemove", handleMouseMove);
+      container.addEventListener("touchmove", handleTouchMove);
+      window.addEventListener("resize", handleResize);
+
       const animate = () => {
         rafRef.current = requestAnimationFrame(animate);
         if (!scene || !camera || !renderer || !plane) return;
-
-        const horizontalRange = 0.25;
-        const verticalRange = 0.20;
-
-        const targetRotationY = mouseX * horizontalRange;
-        const targetRotationX = mouseY * verticalRange;
-
+        const targetRotationY = mouseX * 0.25;
+        const targetRotationX = mouseY * 0.2;
         camera.rotation.y += (targetRotationY - camera.rotation.y) * 0.08;
         camera.rotation.x += (targetRotationX - camera.rotation.x) * 0.08;
-
         renderer.render(scene, camera);
       };
-
       animate();
       setIsLoading3D(false);
-
     } catch (error) {
-      console.error('Error creating 3D scene:', error);
+      console.error("Error creating 3D scene:", error);
       setIsLoading3D(false);
       setShow3DScene(false);
     }
@@ -328,7 +345,7 @@ export default function CameraPage() {
       setTimeout(() => {
         const container = threeContainerRef.current;
         if (container) {
-          create3DScene(capturedPhoto, container);
+          createScene(container, capturedPhoto);
         }
       }, 100);
     }
@@ -336,97 +353,148 @@ export default function CameraPage() {
 
   if (isLoading3D) {
     return (
-      <main className="h-screen bg-black flex items-center justify-center">
+      <main className="min-h-dvh bg-stone-100 flex justify-center p-6 items-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white font-space font-light">Creating 3D scene...</p>
+          <div className="w-16 h-16 border-4 border-emerald-800/30 border-t-emerald-800 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-emerald-800 font-light text-lg">
+            Creating your photo...
+          </p>
         </div>
       </main>
     );
   }
 
   if (show3DScene) {
+    const isButtonDisabled =
+      isUploading || !description.trim() || uploadSuccess;
+    let buttonClass =
+      "px-12 py-6 rounded-2xl font-medium transition-colors duration-300 shadow-lg text-xl "; // Larger padding & text
+    if (uploadSuccess) {
+      buttonClass += "bg-[#617A64] text-white"; // Dark matcha for success
+    } else if (isButtonDisabled) {
+      buttonClass += "bg-gray-400 cursor-not-allowed text-white";
+    } else {
+      buttonClass +=
+        "bg-[#88AB8E] hover:bg-[#617A64] text-white hover:shadow-xl"; // Matcha colors
+    }
+
     return (
-      <main className="h-screen bg-black relative overflow-hidden">
-        <div 
-          ref={(el) => {
-            threeContainerRef.current = el;
-            if (el && capturedPhoto && !isLoading3D) {
-              setTimeout(() => create3DScene(capturedPhoto, el), 50);
-            }
-          }} 
-          className="w-full h-full"
-        ></div>
-
-        <button
-          onClick={resetPhoto}
-          className="absolute top-6 right-6 w-12 h-12 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center text-2xl transition-all duration-300 backdrop-blur-sm z-10"
-        >
-          ×
-        </button>
-
-        <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white z-10">
-          <p className="font-space font-light text-sm mb-3">Move your mouse to look around</p>
-          <button
-            onClick={async () => {
-              try {
-                await uploadPhotoToFirebase(capturedPhoto, 'Camera photo', ['#camera']);
-                // Show success feedback
-                const button = document.querySelector('.upload-btn');
-                const originalText = button.textContent;
-                button.textContent = '✓ Uploaded!';
-                button.className = 'upload-btn bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors';
-                setTimeout(() => {
-                  button.textContent = originalText;
-                  button.className = 'upload-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors';
-                }, 2000);
-              } catch (error) {
-                alert(`Upload failed: ${error.message}`);
-              }
-            }}
-            disabled={isUploading}
-            className={`upload-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isUploading 
-                ? 'bg-gray-500 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {isUploading ? 'Uploading...' : 'Upload to Firebase'}
-          </button>
+      <main className="bg-stone-100 p-6 flex justify-center">
+        <div className="max-w-5xl w-full mx-auto flex flex-col items-center">
+          <div className="flex justify-between items-center mb-8 w-full">
+            <h1 className="text-3xl font-light text-emerald-800">Your Photo</h1>
+            <button
+              onClick={deletePhoto}
+              className="w-12 h-12 bg-emerald-800 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-xl transition-all duration-300 shadow-lg hover:shadow-xl flex-shrink-0"
+            >
+              ×
+            </button>
+          </div>
+          <div className="bg-emerald-800 p-6 rounded-3xl shadow-2xl mb-6 w-full">
+            <div
+              ref={threeContainerRef}
+              className="w-full aspect-video rounded-2xl overflow-hidden bg-emerald-900 touch-pan-y"
+            />
+          </div>
+          <p className="text-center text-emerald-700 mb-6 font-light">
+            Move your mouse to explore your photo in 3D
+          </p>
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={retakePhoto}
+              className="w-20 h-20 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl group"
+            >
+              <div className="w-16 h-16 bg-emerald-800 rounded-full group-hover:bg-emerald-700 transition-all duration-300 flex items-center justify-center">
+                <div className="w-3 h-3 bg-white rounded-full"></div>
+              </div>
+            </button>
+          </div>
+          <div className="bg-white p-10 rounded-3xl shadow-lg mb-10 w-full">
+            <label
+              htmlFor="description"
+              className="block text-lg font-light text-emerald-800 mb-3"
+            >
+              Add a description
+            </label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What's happening in this photo?"
+              className="w-full p-6 border-2 border-stone-200 rounded-2xl resize-none focus:border-emerald-500 focus:outline-none transition-colors duration-300 text-stone-700"
+              rows={4}
+              maxLength={500}
+            />
+            <div className="text-right mt-2 text-sm text-stone-500">
+              {description.length}/500
+            </div>
+          </div>
+          <div className="flex justify-center pb-4">
+            <button
+              onClick={handleUpload}
+              disabled={isButtonDisabled}
+              className={buttonClass}
+            >
+              {isUploading ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Posting...
+                </div>
+              ) : uploadSuccess ? (
+                "✓ Posted!"
+              ) : (
+                "Share Post"
+              )}
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
-
-
   return (
-    <main className="h-screen bg-black relative overflow-hidden">
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="w-full h-full object-cover"
-      />
-
-      <button
-        onClick={closeCamera}
-        className="absolute top-6 right-6 w-12 h-12 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center text-2xl transition-all duration-300 backdrop-blur-sm z-10"
-      >
-        ×
-      </button>
-
-      <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
-        <button
-          onClick={capturePhoto}
-          className="w-20 h-20 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg"
-        >
-          <div className="w-16 h-16 bg-[#2d4a2d] rounded-full hover:bg-[#4a7c59] transition-all duration-300"></div>
-        </button>
+    <main className="bg-stone-100 p-6 flex justify-center">
+      <div className="max-w-5xl w-full mx-auto flex flex-col items-center">
+        <div className="flex justify-between items-center mb-8 w-full">
+          <h1 className="text-3xl font-light text-emerald-800">
+            Capture Photo
+          </h1>
+          <button
+            onClick={closeCamera}
+            className="w-12 h-12 bg-emerald-800 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-xl transition-all duration-300 shadow-lg hover:shadow-xl flex-shrink-0"
+          >
+            ×
+          </button>
+        </div>
+        <div className="bg-emerald-800 p-6 rounded-3xl shadow-2xl w-full">
+          <div className="relative rounded-2xl overflow-hidden bg-emerald-900 w-full max-h-[60vh]">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover aspect-video"
+            />
+            <div className="absolute inset-4 border-2 border-white/30 rounded-xl pointer-events-none">
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-center mt-8 pb-4">
+          <button
+            onClick={capturePhoto}
+            className="w-20 h-20 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl group"
+          >
+            <div className="w-16 h-16 bg-emerald-800 rounded-full group-hover:bg-emerald-700 transition-all duration-300 flex items-center justify-center">
+              <div className="w-3 h-3 bg-white rounded-full"></div>
+            </div>
+          </button>
+        </div>
+        <canvas ref={canvasRef} className="hidden" />
       </div>
-
-      <canvas ref={canvasRef} className="hidden" />
     </main>
   );
 }
