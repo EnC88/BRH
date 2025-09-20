@@ -15,6 +15,8 @@ export default function CameraPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
 
   const firebaseConfig = {
     apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
@@ -36,6 +38,16 @@ export default function CameraPage() {
   const threeContainerRef = useRef(null);
   const rafRef = useRef(null);
   const eventHandlersRef = useRef({});
+
+  const categories = [
+    { value: "", label: "Select a category" },
+    { value: "dining", label: "Dining Halls and Eateries" },
+    { value: "study_spots", label: "Study Spots" },
+    { value: "secret_study_spots", label: "Secret Study Spots" },
+    { value: "best_matcha", label: "Best Matcha" },
+    { value: "cool_places", label: "Cool Spots" },
+    { value: "other", label: "Other" },
+  ];
 
   const stopCamera = () => {
     try {
@@ -160,6 +172,8 @@ export default function CameraPage() {
     setIsLoading3D(false);
     setShowCamera(true);
     setDescription("");
+    setCategory("");
+    setLocation("");
     setUploadSuccess(false);
   };
 
@@ -178,6 +192,8 @@ export default function CameraPage() {
   const uploadPhotoToFirebase = async (
     dataUrl,
     description = "",
+    category = "",
+    location = "",
     tags = []
   ) => {
     setIsUploading(true);
@@ -195,6 +211,8 @@ export default function CameraPage() {
         posts: arrayUnion({
           url: downloadURL,
           description,
+          category,
+          location,
           tags,
           timestamp: new Date().toISOString(),
           filename: file.name,
@@ -213,7 +231,7 @@ export default function CameraPage() {
   const handleUpload = async () => {
     if (uploadSuccess) return;
     try {
-      await uploadPhotoToFirebase(capturedPhoto, description, ["#camera"]);
+      await uploadPhotoToFirebase(capturedPhoto, description, category, location, ["#camera"]);
       setUploadSuccess(true);
       setTimeout(() => {
         window.location.href = "/";
@@ -233,6 +251,8 @@ export default function CameraPage() {
     setShow3DScene(false);
     setIsLoading3D(false);
     setDescription("");
+    setCategory("");
+    setLocation("");
     window.location.href = "/";
   };
 
@@ -427,6 +447,47 @@ export default function CameraPage() {
             />
             <div className="text-right mt-2 text-sm text-stone-500">
               {description.length}/500
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <div>
+                <label
+                  htmlFor="category"
+                  className="block text-lg font-light text-emerald-800 mb-3"
+                >
+                  Category
+                </label>
+                <select
+                  id="category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-6 border-2 border-stone-200 rounded-2xl focus:border-emerald-500 focus:outline-none transition-colors duration-300 text-stone-700 bg-white"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="location"
+                  className="block text-lg font-light text-emerald-800 mb-3"
+                >
+                  Location
+                </label>
+                <input
+                  id="location"
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Where was this taken?"
+                  className="w-full p-6 border-2 border-stone-200 rounded-2xl focus:border-emerald-500 focus:outline-none transition-colors duration-300 text-stone-700"
+                  maxLength={100}
+                />
+              </div>
             </div>
           </div>
           <div className="flex justify-center pb-4">
