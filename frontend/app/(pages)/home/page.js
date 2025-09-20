@@ -54,8 +54,8 @@ async function fetchPosts() {
 
     snapshot.forEach((doc) => {
       const userData = doc.data();
-      if (userData.photos && Array.isArray(userData.photos)) {
-        userData.photos.forEach((photo, index) => {
+      if (userData.posts && Array.isArray(userData.posts)) {
+        userData.posts.forEach((post, index) => {
           allPosts.push({
             id: `${doc.id}_${index}`,
             user: {
@@ -64,13 +64,14 @@ async function fetchPosts() {
               avatar: userData.avatar || "/placeholder.svg",
               displayName: userData.displayName || "User",
             },
-            image: photo.url,
-            caption: photo.caption || "",
-            tag: photo.tags?.[0] || "general",
+            image: post.url,
+            caption: post.description || "",
+            category: post.category || "",
+            location: post.location || "AR Location",
+            tag: post.tags?.[0] || "general",
             likes: Math.floor(Math.random() * 200) + 10, // Random likes for now
             isLiked: false,
-            timestamp: formatTimestamp(photo.timestamp),
-            location: "AR Location",
+            timestamp: formatTimestamp(post.timestamp),
           });
         });
       }
@@ -108,6 +109,18 @@ const mockPosts = [
 export default function HomePage() {
   const [posts, setPosts] = useState(mockPosts);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [allPosts, setAllPosts] = useState([]);
+
+  const categories = [
+    { value: "", label: "All Categories" },
+    { value: "dining", label: "Dining Halls and Eateries" },
+    { value: "study_spots", label: "Study Spots" },
+    { value: "secret_study_spots", label: "Secret Study Spots" },
+    { value: "best_matcha", label: "Best Matcha" },
+    { value: "cool_places", label: "Cool Spots" },
+    { value: "other", label: "Other" },
+  ];
 
   useEffect(() => {
     async function loadPosts() {
@@ -115,14 +128,17 @@ export default function HomePage() {
       try {
         const firebasePosts = await fetchPosts();
         if (firebasePosts.length > 0) {
+          setAllPosts(firebasePosts);
           setPosts(firebasePosts);
         } else {
           // Keep mock posts if no Firebase data
+          setAllPosts(mockPosts);
           setPosts(mockPosts);
         }
       } catch (error) {
         console.error("Failed to load posts:", error);
         // Fallback to mock posts
+        setAllPosts(mockPosts);
         setPosts(mockPosts);
       } finally {
         setLoading(false);
@@ -131,6 +147,16 @@ export default function HomePage() {
 
     loadPosts();
   }, []);
+
+  // Filter posts based on selected category
+  useEffect(() => {
+    if (selectedCategory === "") {
+      setPosts(allPosts);
+    } else {
+      const filteredPosts = allPosts.filter(post => post.category === selectedCategory);
+      setPosts(filteredPosts);
+    }
+  }, [selectedCategory, allPosts]);
 
   const handleLike = (postId) => {
     setPosts(
@@ -151,14 +177,51 @@ export default function HomePage() {
       {/* Background effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#f0fdf4]/20 via-[#f0fdf4]/15 to-[#f0fdf4]/25"></div>
 
-      {/* Header */}
-      <header className="relative z-10 p-4 border-b border-gray-300/20 backdrop-blur-md bg-white/20">
-        <div className="max-w-4xl mx-auto"></div>
-      </header>
-
       {/* Feed */}
       <main className="relative z-10 pb-20 px-4 min-h-screen flex flex-col items-center">
         <div className="w-full max-w-lg">
+          {/* Feed Header */}
+          <div className="flex items-center justify-between mb-6 pt-6">
+            <h1 className="text-2xl font-bold text-[#2d4a2d] tracking-wide">Feed</h1>
+            <div className="relative w-48">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-[#2d4a2d]/30 rounded-lg 
+                           text-[#2d4a2d] font-medium focus:outline-none focus:ring-2 focus:ring-green-400 
+                           cursor-pointer appearance-none pr-8 text-sm truncate"
+              >
+                {categories.map((category) => (
+                  <option
+                    key={category.value}
+                    value={category.value}
+                    className="truncate"
+                  >
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+              {/* Custom dropdown arrow */}
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-[#2d4a2d]"
+                >
+                  <path
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                    d="m6 8 4 4 4-4"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <div className="text-gray-600">Loading posts...</div>
@@ -189,7 +252,7 @@ export default function HomePage() {
                         {post.user.username}
                       </p>
                       <p className="text-gray-600 text-xs">
-                        {post.location} • {post.timestamp}
+                        {post.location || "AR Location"} • {post.timestamp}
                       </p>
                     </div>
                   </div>
@@ -260,14 +323,24 @@ export default function HomePage() {
                     <span className="font-semibold">{post.user.username}</span>{" "}
                     {post.caption}
                   </p>
-                  {post.tag && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-500/30 text-green-700 border border-green-400/50 hover:bg-green-500/40 text-xs font-medium"
-                    >
-                      #{post.tag}
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {post.category && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-[#2d4a2d]/20 text-[#2d4a2d] border border-[#2d4a2d]/30 hover:bg-[#2d4a2d]/30 text-xs font-medium"
+                      >
+                        {categories.find(cat => cat.value === post.category)?.label || post.category}
+                      </Badge>
+                    )}
+                    {post.tag && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-500/30 text-green-700 border border-green-400/50 hover:bg-green-500/40 text-xs font-medium"
+                      >
+                        #{post.tag}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </article>
             ))
