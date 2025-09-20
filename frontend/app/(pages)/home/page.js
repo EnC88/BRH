@@ -72,15 +72,19 @@ async function fetchPosts() {
             likes: Math.floor(Math.random() * 200) + 10, // Random likes for now
             isLiked: false,
             timestamp: formatTimestamp(post.timestamp),
+            originalTimestamp: post.timestamp, 
           });
         });
       }
     });
 
-    // Sort by timestamp (newest first)
-    return allPosts.sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-    );
+    // Sort by timestamp (newest first) - use the original timestamp from Firebase
+    return allPosts.sort((a, b) => {
+      // Get the original timestamp from the post data
+      const timestampA = a.originalTimestamp || a.timestamp;
+      const timestampB = b.originalTimestamp || b.timestamp;
+      return new Date(timestampB) - new Date(timestampA);
+    });
   } catch (error) {
     console.error("Error fetching posts:", error);
     return [];
@@ -146,6 +150,26 @@ export default function HomePage() {
     }
 
     loadPosts();
+
+    // Refresh posts when page becomes visible (e.g., returning from camera)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadPosts();
+      }
+    };
+
+    // Also refresh when window gains focus
+    const handleFocus = () => {
+      loadPosts();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Filter posts based on selected category
