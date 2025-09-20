@@ -52,7 +52,7 @@ const Footer = () => {
         <ul className="space-y-2">
           <li>
             <a
-              href=""
+              href="/instagram"
               className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               Instagram
