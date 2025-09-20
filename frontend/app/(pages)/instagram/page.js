@@ -1,6 +1,7 @@
 // src/app/page.js
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '/utils/firebase'; // Import from the new file
@@ -9,6 +10,7 @@ export default function Page() {
   const [userStatus, setUserStatus] = useState("Not signed in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -48,6 +50,9 @@ export default function Page() {
       } else {
         console.log('👤 User already exists in Firestore.');
       }
+      
+      // Redirect to /home after successful login
+      router.push('/home');
     } catch (error) {
       console.error("Sign-in error:", error);
       alert("Sign-in failed. Check the console for details.");
