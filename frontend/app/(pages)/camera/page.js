@@ -17,6 +17,8 @@ export default function CameraPage() {
   const [description, setDescription] = useState("");
   const [cameraError, setCameraError] = useState(null);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
 
   const firebaseConfig = {
     apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
