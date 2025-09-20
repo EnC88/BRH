@@ -106,18 +106,20 @@ export default function CameraPage() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          
+
           // Use reverse geocoding to get a readable address
           const response = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
           );
-          
+
           if (response.ok) {
             const data = await response.json();
-            const locationString = data.city && data.principalSubdivision 
-              ? `${data.city}, ${data.principalSubdivision}`
-              : data.locality || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-            
+            const locationString =
+              data.city && data.principalSubdivision
+                ? `${data.city}, ${data.principalSubdivision}`
+                : data.locality ||
+                  `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
             setLocation(locationString);
           } else {
             // Fallback to coordinates if geocoding fails
@@ -135,10 +137,12 @@ export default function CameraPage() {
       (error) => {
         console.error("Error getting location:", error);
         setIsGettingLocation(false);
-        
+
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            alert("Location access denied. Please enable location permissions.");
+            alert(
+              "Location access denied. Please enable location permissions."
+            );
             break;
           case error.POSITION_UNAVAILABLE:
             alert("Location information is unavailable.");
@@ -154,7 +158,7 @@ export default function CameraPage() {
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000 // 5 minutes
+        maximumAge: 300000, // 5 minutes
       }
     );
   };
@@ -182,18 +186,18 @@ export default function CameraPage() {
       stopCamera();
       return;
     }
-    
+
     const initializeCamera = async () => {
       try {
         setCameraError(null);
         setPermissionRequested(true);
         stopCamera();
-        
+
         // Check if getUserMedia is supported
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error("Camera not supported on this device");
         }
-        
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "user",
@@ -201,12 +205,12 @@ export default function CameraPage() {
             height: { ideal: 720 },
           },
         });
-        
+
         if (!active) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -221,22 +225,24 @@ export default function CameraPage() {
       } catch (err) {
         console.error("Camera error:", err);
         stopCamera();
-        
+
         // Handle specific error types
-        if (err.name === 'NotAllowedError') {
-          setCameraError("Camera permission denied. Please allow camera access and refresh the page.");
-        } else if (err.name === 'NotFoundError') {
+        if (err.name === "NotAllowedError") {
+          setCameraError(
+            "Camera permission denied. Please allow camera access and refresh the page."
+          );
+        } else if (err.name === "NotFoundError") {
           setCameraError("No camera found on this device.");
-        } else if (err.name === 'NotReadableError') {
+        } else if (err.name === "NotReadableError") {
           setCameraError("Camera is already in use by another application.");
         } else {
           setCameraError(`Camera error: ${err.message}`);
         }
       }
     };
-    
+
     initializeCamera();
-    
+
     return () => {
       active = false;
     };
@@ -333,10 +339,16 @@ export default function CameraPage() {
   const handleUpload = async () => {
     if (uploadSuccess) return;
     try {
-      await uploadPhotoToFirebase(capturedPhoto, description, category, location, ["#camera"]);
+      await uploadPhotoToFirebase(
+        capturedPhoto,
+        description,
+        category,
+        location,
+        ["#camera"]
+      );
       setUploadSuccess(true);
       setTimeout(() => {
-        window.location.href = "/";
+        window.location.href = "/home";
       }, 1500);
     } catch (error) {
       alert(`Upload failed: ${error.message}`);
@@ -345,9 +357,9 @@ export default function CameraPage() {
 
   const closeCamera = () => {
     stopCamera();
-    window.location.href = "/";
+    window.location.href = "/home";
   };
-  
+
   const deletePhoto = () => {
     cleanupThree();
     setCapturedPhoto(null);
@@ -356,7 +368,7 @@ export default function CameraPage() {
     setDescription("");
     setCategory("");
     setLocation("");
-    window.location.href = "/";
+    window.location.href = "/camera";
   };
 
   const createScene = async (container, photoDataUrl) => {
@@ -603,9 +615,7 @@ export default function CameraPage() {
                         Getting...
                       </>
                     ) : (
-                      <>
-                        📍 Get Location
-                      </>
+                      <>📍 Get Location</>
                     )}
                   </button>
                 </div>
@@ -649,11 +659,13 @@ export default function CameraPage() {
             ×
           </button>
         </div>
-        
+
         {cameraError ? (
           <div className="bg-white p-8 rounded-3xl shadow-2xl w-full text-center">
             <div className="text-red-500 text-6xl mb-4">📷</div>
-            <h2 className="text-2xl font-medium text-gray-800 mb-4">Camera Access Required</h2>
+            <h2 className="text-2xl font-medium text-gray-800 mb-4">
+              Camera Access Required
+            </h2>
             <p className="text-gray-600 mb-6 leading-relaxed">{cameraError}</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
@@ -671,7 +683,8 @@ export default function CameraPage() {
             </div>
             <div className="mt-6 p-4 bg-blue-50 rounded-xl">
               <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> Make sure to allow camera permissions when prompted by your browser.
+                <strong>Tip:</strong> Make sure to allow camera permissions when
+                prompted by your browser.
               </p>
             </div>
           </div>
@@ -706,7 +719,7 @@ export default function CameraPage() {
             </div>
           </>
         )}
-        
+
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </main>
