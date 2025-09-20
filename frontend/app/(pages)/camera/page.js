@@ -15,8 +15,8 @@ export default function CameraPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [cameraError, setCameraError] = useState(null);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   const firebaseConfig = {
     apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
@@ -114,9 +114,18 @@ export default function CameraPage() {
       stopCamera();
       return;
     }
-    (async () => {
+    
+    const initializeCamera = async () => {
       try {
+        setCameraError(null);
+        setPermissionRequested(true);
         stopCamera();
+        
+        // Check if getUserMedia is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera not supported on this device");
+        }
+        
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "user",
@@ -124,10 +133,12 @@ export default function CameraPage() {
             height: { ideal: 720 },
           },
         });
+        
         if (!active) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -142,8 +153,22 @@ export default function CameraPage() {
       } catch (err) {
         console.error("Camera error:", err);
         stopCamera();
+        
+        // Handle specific error types
+        if (err.name === 'NotAllowedError') {
+          setCameraError("Camera permission denied. Please allow camera access and refresh the page.");
+        } else if (err.name === 'NotFoundError') {
+          setCameraError("No camera found on this device.");
+        } else if (err.name === 'NotReadableError') {
+          setCameraError("Camera is already in use by another application.");
+        } else {
+          setCameraError(`Camera error: ${err.message}`);
+        }
       }
-    })();
+    };
+    
+    initializeCamera();
+    
     return () => {
       active = false;
     };
@@ -175,6 +200,14 @@ export default function CameraPage() {
     setCategory("");
     setLocation("");
     setUploadSuccess(false);
+    setCameraError(null);
+  };
+
+  const retryCamera = () => {
+    setCameraError(null);
+    setPermissionRequested(false);
+    setShowCamera(false);
+    setTimeout(() => setShowCamera(true), 100);
   };
 
   const dataURLtoFile = (dataurl, filename) => {
@@ -527,33 +560,64 @@ export default function CameraPage() {
             ×
           </button>
         </div>
-        <div className="bg-emerald-800 p-6 rounded-3xl shadow-2xl w-full">
-          <div className="relative rounded-2xl overflow-hidden bg-emerald-900 w-full max-h-[60vh]">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover aspect-video"
-            />
-            <div className="absolute inset-4 border-2 border-white/30 rounded-xl pointer-events-none">
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
+        
+        {cameraError ? (
+          <div className="bg-white p-8 rounded-3xl shadow-2xl w-full text-center">
+            <div className="text-red-500 text-6xl mb-4">📷</div>
+            <h2 className="text-2xl font-medium text-gray-800 mb-4">Camera Access Required</h2>
+            <p className="text-gray-600 mb-6 leading-relaxed">{cameraError}</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={retryCamera}
+                className="px-6 py-3 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors duration-300"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={closeCamera}
+                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-medium transition-colors duration-300"
+              >
+                Go Back
+              </button>
+            </div>
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl">
+              <p className="text-sm text-blue-800">
+                <strong>Tip:</strong> Make sure to allow camera permissions when prompted by your browser.
+              </p>
             </div>
           </div>
-        </div>
-        <div className="flex justify-center mt-8 pb-4">
-          <button
-            onClick={capturePhoto}
-            className="w-20 h-20 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl group"
-          >
-            <div className="w-16 h-16 bg-emerald-800 rounded-full group-hover:bg-emerald-700 transition-all duration-300 flex items-center justify-center">
-              <div className="w-3 h-3 bg-white rounded-full"></div>
+        ) : (
+          <>
+            <div className="bg-emerald-800 p-6 rounded-3xl shadow-2xl w-full">
+              <div className="relative rounded-2xl overflow-hidden bg-emerald-900 w-full max-h-[60vh]">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover aspect-video"
+                />
+                <div className="absolute inset-4 border-2 border-white/30 rounded-xl pointer-events-none">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
+                </div>
+              </div>
             </div>
-          </button>
-        </div>
+            <div className="flex justify-center mt-8 pb-4">
+              <button
+                onClick={capturePhoto}
+                className="w-20 h-20 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl group"
+              >
+                <div className="w-16 h-16 bg-emerald-800 rounded-full group-hover:bg-emerald-700 transition-all duration-300 flex items-center justify-center">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+        
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </main>
