@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   faBars,
   faClose,
-  faCamera, // 👈 use camera icon
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -38,22 +38,18 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`bg-white shadow-sm border-b border-stone-200 transition-colors duration-300 ${
+      className={`bg-[#f5f5f0] border-b border-green-400/20 transition-colors duration-300 ${
         isScrolled ? "py-4" : "py-6"
       }`}
     >
       <div className="max-w-7xl mx-auto flex justify-between items-center px-6 sm:px-10">
         {/* Logo and Brand */}
-        <div className="flex items-center gap-3">
-          <FontAwesomeIcon
-            icon={faCamera}
-            className="text-emerald-800 text-2xl"
-          />
+        <div className="flex items-center">
           <Link
             href="/"
-            className="text-emerald-700 hover:text-emerald-800 font-light transition-colors duration-300 text-3xl"
+            className="text-[#2d4a2d] hover:text-[#4a7c59] font-bold transition-colors duration-300 text-3xl tracking-wide"
           >
-            Glimpse
+            glimpse
           </Link>
         </div>
 
@@ -61,13 +57,16 @@ const Navbar = () => {
         <div className="flex items-center gap-4 sm:gap-6">
           <Link
             href="/camera"
-            className="px-3 py-2 rounded-lg text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-light transition-colors duration-300 text-lg"
+            className="w-10 h-10 rounded-full border-2 border-[#2d4a2d] bg-transparent hover:bg-[#2d4a2d] flex items-center justify-center transition-colors duration-300"
           >
-            Create Post
+            <FontAwesomeIcon
+              icon={faPlus}
+              className="text-[#2d4a2d] hover:text-white text-lg transition-colors duration-300"
+            />
           </Link>
           <Link
             href="/home"
-            className="px-3 py-2 rounded-lg text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-light transition-colors duration-300 text-lg"
+            className="px-4 py-3 rounded-lg text-[#2d4a2d] hover:text-[#4a7c59] hover:bg-green-400/10 font-medium transition-colors duration-300 text-lg"
           >
             Feed
           </Link>

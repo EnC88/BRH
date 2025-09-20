@@ -143,7 +143,6 @@ export default function HomePage() {
       {/* Header */}
       <header className="relative z-10 p-4 border-b border-gray-300/20 backdrop-blur-md bg-white/20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="font-bold text-2xl text-gray-800 tracking-wide text-center">glimpse</h1>
         </div>
       </header>
 
