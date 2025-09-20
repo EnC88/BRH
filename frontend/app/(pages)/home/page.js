@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import ChatbotPopup from "@/components/ChatbotPopup";
+import Post3DScene from "@/components/Post3DScene";
 import {
   getFirestore,
   collection,
@@ -61,7 +62,7 @@ async function fetchPosts() {
             user: {
               username:
                 userData.displayName || userData.email?.split("@")[0] || "User",
-              avatar: userData.avatar || "/placeholder.svg",
+              avatar: userData.avatar || "https://via.placeholder.com/150/4a7c59/ffffff?text=User",
               displayName: userData.displayName || "User",
             },
             image: post.url,
@@ -97,10 +98,10 @@ const mockPosts = [
     id: 1,
     user: {
       username: "demo_user",
-      avatar: "/placeholder.svg",
+      avatar: "https://via.placeholder.com/150/4a7c59/ffffff?text=User",
       displayName: "Demo User",
     },
-    image: "/placeholder.svg",
+    image: "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Posts+Yet",
     caption: "No posts yet. Upload your first AR photo to get started!",
     tag: "welcome",
     likes: 0,
@@ -261,7 +262,7 @@ export default function HomePage() {
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 ring-2 ring-green-400/50">
                       <AvatarImage
-                        src={post.user.avatar || "/placeholder.svg"}
+                        src={post.user.avatar || "https://via.placeholder.com/150/4a7c59/ffffff?text=User"}
                         alt={post.user.username}
                       />
                       <AvatarFallback className="bg-green-500 text-white font-medium">
@@ -289,19 +290,14 @@ export default function HomePage() {
                   </Button>
                 </div>
 
-                {/* Post Image */}
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent z-10 pointer-events-none"></div>
-                  <img
-                    src={post.image || "/placeholder.svg"}
-                    alt="AR Scene"
-                    className="w-full aspect-square object-cover rounded-lg"
-                    onError={(e) => {
-                      e.target.src = "/placeholder.svg";
-                    }}
+                {/* Post 3D Scene */}
+                <div className="relative group rounded-lg overflow-hidden">
+                  <Post3DScene 
+                    imageUrl={post.image || "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Image"}
+                    className="rounded-lg"
                   />
                   {/* Holographic overlay effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                 </div>
 
                 {/* Post Actions */}
