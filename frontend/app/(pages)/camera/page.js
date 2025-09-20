@@ -2,12 +2,33 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { initializeApp } from 'firebase/app';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export default function CameraPage() {
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [show3DScene, setShow3DScene] = useState(false);
   const [isLoading3D, setIsLoading3D] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
+    authDomain: "brh2025-4b271.firebaseapp.com",
+    projectId: "brh2025-4b271",
+    storageBucket: "brh2025-4b271.firebasestorage.app",
+    messagingSenderId: "858895632224",
+    appId: "1:858895632224:web:3c09a5d9b77c9da0438005"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const storage = getStorage(app);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -97,6 +118,65 @@ export default function CameraPage() {
     setShowCamera(false);
     setShow3DScene(true);
     stopCamera();
+  };
+
+  // Function to convert data URL to File object (same as in storing_photos.js)
+  const dataURLtoFile = (dataurl, filename) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
+  };
+
+  // Function to upload photo to Firebase
+  const uploadPhotoToFirebase = async (dataUrl, caption = '', tags = []) => {
+    setIsUploading(true);
+    
+    try {
+      // Check if user is authenticated
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Please sign in to upload photos');
+      }
+
+      // Convert data URL to File
+      const file = dataURLtoFile(dataUrl, `photo_${Date.now()}.jpg`);
+      
+      // Create storage reference
+      const storageRef = ref(storage, `uploads/${file.name}`);
+      
+      // Upload file to Firebase Storage
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      // Save photo metadata to Firestore
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, {
+        photos: arrayUnion({
+          url: downloadURL,
+          caption: caption,
+          tags: tags,
+          timestamp: new Date().toISOString(),
+          filename: file.name
+        })
+      });
+      
+      return {
+        success: true,
+        downloadURL: downloadURL,
+        filename: file.name
+      };
+    } catch (error) {
+      console.error('Upload failed:', error);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const closeCamera = () => {
@@ -286,7 +366,33 @@ export default function CameraPage() {
         </button>
 
         <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white z-10">
-          <p className="font-space font-light text-sm">Move your mouse to look around</p>
+          <p className="font-space font-light text-sm mb-3">Move your mouse to look around</p>
+          <button
+            onClick={async () => {
+              try {
+                await uploadPhotoToFirebase(capturedPhoto, 'Camera photo', ['#camera']);
+                // Show success feedback
+                const button = document.querySelector('.upload-btn');
+                const originalText = button.textContent;
+                button.textContent = '✓ Uploaded!';
+                button.className = 'upload-btn bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors';
+                setTimeout(() => {
+                  button.textContent = originalText;
+                  button.className = 'upload-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors';
+                }, 2000);
+              } catch (error) {
+                alert(`Upload failed: ${error.message}`);
+              }
+            }}
+            disabled={isUploading}
+            className={`upload-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isUploading 
+                ? 'bg-gray-500 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {isUploading ? 'Uploading...' : 'Upload to Firebase'}
+          </button>
         </div>
       </main>
     );
