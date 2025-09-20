@@ -17,11 +17,16 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const storage = firebase.storage();
+const auth = firebase.auth();
 
-function upload_photo(file) {
+async function upload_photo(file) {
     
     const storageRef = storage.ref(`uploads/${file.name}`);
-    storageRef.put(file)
+    storageRef.put(file);
+    const user = auth.currentUser;
+    await db.collection("users").doc(user.uid).update({
+        photos: photos.push(snapshot.ref.getDownloadURL()) // or "moderator", etc.
+    });
     return snapshot.ref.getDownloadURL();
         
 }
