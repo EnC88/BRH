@@ -1,80 +1,69 @@
+// src/app/page.js
 'use client';
-import { useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
+import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '/utils/firebase'; // Import from the new file
 
 export default function Page() {
+  const [userStatus, setUserStatus] = useState("Not signed in");
+
   useEffect(() => {
-    // Load Firebase scripts from CDN
-    const loadScript = (src) =>
-      new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.body.appendChild(script);
-      });
-
-    async function initFirebase() {
-      await loadScript('https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/10.5.2/firebase-auth-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore-compat.js');
-
-      const firebaseConfig = {
-        apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
-        authDomain: "brh2025-4b271.firebaseapp.com",
-        projectId: "brh2025-4b271",
-        storageBucket: "brh2025-4b271.firebasestorage.app",
-        messagingSenderId: "858895632224",
-        appId: "1:858895632224:web:3c09a5d9b77c9da0438005"
-      };
-
-      firebase.initializeApp(firebaseConfig);
-      const auth = firebase.auth();
-      const db = firebase.firestore();
-
-      const googleBtn = document.getElementById('googleSignInBtn');
-      const statusText = document.getElementById('status');
-
-      googleBtn.onclick = () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider)
-          .then(async result => {
-            const user = result.user;
-            statusText.textContent = `Signed in as ${user.email}`;
-
-            const userRef = db.collection('users').doc(user.uid);
-            const doc = await userRef.get();
-
-            if (!doc.exists) {
-              await userRef.set({
-                email: user.email,
-                displayName: user.displayName,
-                photos: [],
-                joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
-              console.log('✅ New user document created in Firestore.');
-            } else {
-              console.log('👤 User already exists in Firestore.');
-            }
-
-          })
-          .catch(error => {
-            console.error("Sign-in error:", error);
-            alert("Sign-in failed.");
-          });
-      };
-    }
-
-    initFirebase();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserStatus(`Signed in as ${user.email}`);
+      } else {
+        setUserStatus("Not signed in");
+      }
+    });
+    return () => unsubscribe();
   }, []);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (!user || !user.uid) {
+        throw new Error("User info is missing after sign-in.");
+      }
+      console.log("HELLO");
+      console.log(user.uid);
+
+      const userRef = doc(db, 'users', user.uid);
+      console.log("USER REF");
+      console.log(userRef);
+      const userDoc = await getDoc(userRef);
+      console.log("USER DOC");
+      console.log(userDoc);
+
+      if (!userDoc.exists()) {
+        await setDoc(userRef, {
+          email: user.email,
+          displayName: user.displayName,
+          photos: [],
+          joinedAt: serverTimestamp()
+        });
+        console.log('✅ New user document created in Firestore.');
+      } else {
+        console.log('👤 User already exists in Firestore.');
+      }
+    } catch (error) {
+      console.error("Sign-in error:", error);
+      alert("Sign-in failed. Check the console for details.");
+    }
+  };
 
   return (
     <div style={styles.body}>
       <div style={styles.loginBox}>
         <h2>Sign in with Google</h2>
-        <button id="googleSignInBtn" style={styles.button}>
+        <button onClick={handleGoogleSignIn} style={styles.button}>
           Continue with Google
         </button>
-        <p id="status" style={styles.status}>Not signed in</p>
+        <p id="status" style={styles.status}>{userStatus}</p>
       </div>
     </div>
   );
