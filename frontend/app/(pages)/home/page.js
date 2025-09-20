@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Heart, MessageCircle, Share, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Share, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,11 @@ import {
   query,
   orderBy,
   limit,
+  doc,
+  updateDoc,
+  arrayRemove,
 } from "firebase/firestore";
+import { getStorage, ref, deleteObject } from "firebase/storage";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -32,6 +36,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Function to format timestamp
 function formatTimestamp(timestamp) {
@@ -59,6 +64,8 @@ async function fetchPosts() {
         userData.posts.forEach((post, index) => {
           allPosts.push({
             id: `${doc.id}_${index}`,
+            userId: doc.id,
+            postIndex: index,
             user: {
               username:
                 userData.displayName || userData.email?.split("@")[0] || "User",
@@ -73,7 +80,9 @@ async function fetchPosts() {
             likes: Math.floor(Math.random() * 200) + 10, // Random likes for now
             isLiked: false,
             timestamp: formatTimestamp(post.timestamp),
-            originalTimestamp: post.timestamp, 
+            originalTimestamp: post.timestamp,
+            filename: post.filename,
+            originalPost: post, // Store the original post data for deletion
           });
         });
       }
@@ -89,6 +98,50 @@ async function fetchPosts() {
   } catch (error) {
     console.error("Error fetching posts:", error);
     return [];
+  }
+}
+
+// Function to delete image from Firebase Storage
+async function deleteImageFromStorage(filename) {
+  try {
+    if (!filename) {
+      console.warn("No filename provided for deletion");
+      return;
+    }
+    
+    const imageRef = ref(storage, `uploads/${filename}`);
+    await deleteObject(imageRef);
+    console.log("Image deleted from storage:", filename);
+  } catch (error) {
+    console.error("Error deleting image from storage:", error);
+    // Don't throw error here as the image might already be deleted
+  }
+}
+
+// Function to delete post from Firebase
+async function deletePost(post) {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // Delete the image from storage first
+    if (post.filename) {
+      await deleteImageFromStorage(post.filename);
+    }
+
+    // Remove the post from Firestore
+    const userDocRef = doc(db, "users", post.userId);
+    await updateDoc(userDocRef, {
+      posts: arrayRemove(post.originalPost)
+    });
+
+    console.log("Post deleted successfully");
+    return true;
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    throw error;
   }
 }
 
@@ -116,6 +169,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [allPosts, setAllPosts] = useState([]);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [deletingPost, setDeletingPost] = useState(null);
 
   const categories = [
     { value: "", label: "All Categories" },
@@ -164,12 +219,21 @@ export default function HomePage() {
       loadPosts();
     };
 
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setOpenDropdown(null);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('click', handleClickOutside);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, []);
 
@@ -195,6 +259,34 @@ export default function HomePage() {
           : post
       )
     );
+  };
+
+  const handleDeletePost = async (post) => {
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+      return;
+    }
+
+    setDeletingPost(post.id);
+    setOpenDropdown(null);
+
+    try {
+      await deletePost(post);
+      
+      // Remove the post from local state
+      setPosts(posts.filter(p => p.id !== post.id));
+      setAllPosts(allPosts.filter(p => p.id !== post.id));
+      
+      alert("Post deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      alert(`Failed to delete post: ${error.message}`);
+    } finally {
+      setDeletingPost(null);
+    }
+  };
+
+  const toggleDropdown = (postId) => {
+    setOpenDropdown(openDropdown === postId ? null : postId);
   };
 
   return (
@@ -281,13 +373,29 @@ export default function HomePage() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-800"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <div className="relative dropdown-container">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-800"
+                      onClick={() => toggleDropdown(post.id)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    
+                    {openDropdown === post.id && (
+                      <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                        <button
+                          onClick={() => handleDeletePost(post)}
+                          disabled={deletingPost === post.id}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {deletingPost === post.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Post 3D Scene */}
