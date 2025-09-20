@@ -15,10 +15,11 @@ export default function CameraPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [description, setDescription] = useState("");
-  const [cameraError, setCameraError] = useState(null);
-  const [permissionRequested, setPermissionRequested] = useState(false);
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   const firebaseConfig = {
     apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
@@ -91,6 +92,71 @@ export default function CameraPage() {
     } catch (e) {
       console.warn("cleanupThree error", e);
     }
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    setIsGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Use reverse geocoding to get a readable address
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            const locationString = data.city && data.principalSubdivision 
+              ? `${data.city}, ${data.principalSubdivision}`
+              : data.locality || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+            
+            setLocation(locationString);
+          } else {
+            // Fallback to coordinates if geocoding fails
+            setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+        } catch (error) {
+          console.error("Error getting location name:", error);
+          // Fallback to coordinates
+          const { latitude, longitude } = position.coords;
+          setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        setIsGettingLocation(false);
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            alert("Location access denied. Please enable location permissions.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            alert("Location information is unavailable.");
+            break;
+          case error.TIMEOUT:
+            alert("Location request timed out.");
+            break;
+          default:
+            alert("An unknown error occurred while getting location.");
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      }
+    );
   };
 
   useEffect(() => {
@@ -203,6 +269,7 @@ export default function CameraPage() {
     setLocation("");
     setUploadSuccess(false);
     setCameraError(null);
+    setIsGettingLocation(false);
   };
 
   const retryCamera = () => {
@@ -280,6 +347,7 @@ export default function CameraPage() {
     stopCamera();
     window.location.href = "/";
   };
+  
   const deletePhoto = () => {
     cleanupThree();
     setCapturedPhoto(null);
@@ -513,15 +581,34 @@ export default function CameraPage() {
                 >
                   Location
                 </label>
-                <input
-                  id="location"
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Where was this taken?"
-                  className="w-full p-6 border-2 border-stone-200 rounded-2xl focus:border-emerald-500 focus:outline-none transition-colors duration-300 text-stone-700"
-                  maxLength={100}
-                />
+                <div className="flex gap-3">
+                  <input
+                    id="location"
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Where was this taken?"
+                    className="flex-1 p-6 border-2 border-stone-200 rounded-2xl focus:border-emerald-500 focus:outline-none transition-colors duration-300 text-stone-700"
+                    maxLength={100}
+                  />
+                  <button
+                    type="button"
+                    onClick={getCurrentLocation}
+                    disabled={isGettingLocation}
+                    className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 disabled:bg-gray-400 text-white rounded-2xl font-medium transition-colors duration-300 flex items-center gap-2 min-w-[120px] justify-center"
+                  >
+                    {isGettingLocation ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Getting...
+                      </>
+                    ) : (
+                      <>
+                        📍 Get Location
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
