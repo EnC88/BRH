@@ -59,7 +59,7 @@ export default function Page() {
   return (
     <div style={styles.body}>
       <div style={styles.loginBox}>
-        <h2>Sign in with Google</h2>
+        <h2 style={styles.signin}>Sign in with Google</h2>
         <button onClick={handleGoogleSignIn} style={styles.button}>
           Continue with Google
         </button>
@@ -75,6 +75,7 @@ const styles = {
     padding: 0,
     fontFamily: 'Arial, sans-serif',
     background: '#f7f7f7',
+    color: '#000000',
     display: 'flex',
     height: '100vh',
     justifyContent: 'center',
@@ -101,5 +102,9 @@ const styles = {
     marginTop: '20px',
     fontSize: '14px',
     color: '#555'
+  },
+  signin: {
+    fontSize: '24px',
+    marginBottom: '30px'
   }
 };
