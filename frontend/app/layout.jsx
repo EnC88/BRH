@@ -10,7 +10,7 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${instrumentSerif.variable} ${spaceGrotesk.variable}`}
     >
-      <body className={`${spaceGrotesk.className}`}>
+      <body className={`${instrumentSerif.variable}`}>
         <Navbar />
         {children}
         <Footer />

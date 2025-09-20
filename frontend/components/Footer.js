@@ -1,33 +1,34 @@
 import React from "react";
+
 const Footer = () => {
   const now = new Date();
   const year = now.getFullYear();
 
   return (
-    <div className="pt-5 grid grid-cols-4 md:grid-cols-12 bg-gradient-to-r from-myRed-300 via-Blue-200 to-myRed-500 pb-14 px-5">
-      <div className="col-span-2 md:col-span-6 flex flex-col items-center md:items-start">
-        <div className="w-full max-w-md text-left">
-          <a href="#hero">
-            <h1 className="font-instrument text-md md:text-3xl text-white hover:text-stone-200">
-              BRH
-            </h1>
-            <p className="font-instrument text-xs text-neutral-400 hover:text-neutral-500 font-light">
-              Made with love from scratch. &copy; {year}.
-            </p>
-          </a>
-        </div>
+    <div className="pt-5 grid grid-cols-1 md:grid-cols-3 gap-8 bg-[#2d4a2d] pb-14 px-20">
+      {/* Left Section */}
+      <div className="w-full text-center md:text-left">
+        <a href="#hero">
+          <h1 className="font-instrument text-4xl md:text-5xl text-white hover:text-[#c8e6c9]">
+            BRH
+          </h1>
+          <p className="font-instrument text-sm md:text-base text-[#e8f5e8] hover:text-[#c8e6c9] font-light">
+            Made with love from scratch. &copy; {year}.
+          </p>
+        </a>
       </div>
 
-      <div className="col-span-1 md:col-span-3 flex flex-col items-center md:items-start">
-        <h1 className="font-instrument text-md md:text-3xl text-white hover:text-stone-200">
+      {/* Quick Links */}
+      <div className="flex flex-col items-center md:items-start">
+        <h2 className="font-instrument text-2xl md:text-3xl text-white hover:text-[#c8e6c9] mb-2">
           Quick Links
-        </h1>
-        <ul className="space-y-1">
+        </h2>
+        <ul className="space-y-2">
           <li>
             <a
               href=""
               target="_blank"
-              className="font-instrument font-extralight text-sm md:text-lg text-stone-100 hover:text-stone-200"
+              className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               App
             </a>
@@ -35,7 +36,7 @@ const Footer = () => {
           <li>
             <a
               href=""
-              className="font-instrument font-extralight text-sm md:text-lg text-stone-100 hover:text-stone-200"
+              className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               About Us
             </a>
@@ -43,15 +44,16 @@ const Footer = () => {
         </ul>
       </div>
 
-      <div className="col-span-1 md:col-span-3 flex flex-col items-center md:items-start">
-        <h1 className="font-instrument text-md md:text-3xl text-white hover:text-stone-200">
+      {/* Socials */}
+      <div className="flex flex-col items-center md:items-start">
+        <h2 className="font-instrument text-2xl md:text-3xl text-white hover:text-[#c8e6c9] mb-2">
           Our Socials
-        </h1>
-        <ul className="space-y-1">
+        </h2>
+        <ul className="space-y-2">
           <li>
             <a
               href=""
-              className="font-instrument font-extralight text-sm md:text-lg text-stone-100 hover:text-stone-200"
+              className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               Instagram
             </a>
@@ -59,7 +61,7 @@ const Footer = () => {
           <li>
             <a
               href=""
-              className="font-instrument font-extralight text-sm md:text-lg text-stone-100 hover:text-stone-200"
+              className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               Youtube
             </a>
@@ -67,7 +69,7 @@ const Footer = () => {
           <li>
             <a
               href=""
-              className="font-instrument font-extralight text-sm md:text-lg text-stone-100 hover:text-stone-200"
+              className="font-instrument font-medium text-base md:text-lg text-[#e8f5e8] hover:text-[#c8e6c9]"
             >
               GitHub
             </a>
