@@ -1,62 +1,125 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Heart, MessageCircle, Share, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { initializeApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
+import { getFirestore, collection, getDocs, query, orderBy, limit } from 'firebase/firestore'
 
-// Mock data for posts
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
+  authDomain: "brh2025-4b271.firebaseapp.com",
+  projectId: "brh2025-4b271",
+  storageBucket: "brh2025-4b271.firebasestorage.app",
+  messagingSenderId: "858895632224",
+  appId: "1:858895632224:web:3c09a5d9b77c9da0438005"
+}
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig)
+const auth = getAuth(app)
+const db = getFirestore(app)
+
+// Function to format timestamp
+function formatTimestamp(timestamp) {
+  const now = new Date()
+  const postTime = new Date(timestamp)
+  const diffInHours = Math.floor((now - postTime) / (1000 * 60 * 60))
+  
+  if (diffInHours < 1) return 'Just now'
+  if (diffInHours < 24) return `${diffInHours}h ago`
+  const diffInDays = Math.floor(diffInHours / 24)
+  if (diffInDays < 7) return `${diffInDays}d ago`
+  return postTime.toLocaleDateString()
+}
+
+// Function to fetch posts from Firebase
+async function fetchPosts() {
+  try {
+    const usersRef = collection(db, 'users')
+    const snapshot = await getDocs(usersRef)
+    const allPosts = []
+    
+    snapshot.forEach((doc) => {
+      const userData = doc.data()
+      if (userData.photos && Array.isArray(userData.photos)) {
+        userData.photos.forEach((photo, index) => {
+          allPosts.push({
+            id: `${doc.id}_${index}`,
+            user: {
+              username: userData.displayName || userData.email?.split('@')[0] || 'User',
+              avatar: userData.avatar || "/placeholder.svg",
+              displayName: userData.displayName || 'User',
+            },
+            image: photo.url,
+            caption: photo.caption || '',
+            tag: photo.tags?.[0] || 'general',
+            likes: Math.floor(Math.random() * 200) + 10, // Random likes for now
+            isLiked: false,
+            timestamp: formatTimestamp(photo.timestamp),
+            location: 'AR Location',
+          })
+        })
+      }
+    })
+    
+    // Sort by timestamp (newest first)
+    return allPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  } catch (error) {
+    console.error('Error fetching posts:', error)
+    return []
+  }
+}
+
+// Mock data for posts (fallback - only used if no Firebase data)
 const mockPosts = [
   {
     id: 1,
     user: {
-      username: "alex_explorer",
-      avatar: "/futuristic-avatar.png",
-      displayName: "Alex Chen",
+      username: "demo_user",
+      avatar: "/placeholder.svg",
+      displayName: "Demo User",
     },
-    image: "/futuristic-cityscape-ar-scene.jpg",
-    caption: "Found this incredible AR portal in downtown! The holographic effects are mind-blowing 🌆",
-    tag: "cityscape",
-    likes: 127,
+    image: "/placeholder.svg",
+    caption: "No posts yet. Upload your first AR photo to get started!",
+    tag: "welcome",
+    likes: 0,
     isLiked: false,
-    timestamp: "2h ago",
-    location: "Neo Tokyo District",
-  },
-  {
-    id: 2,
-    user: {
-      username: "maya_tech",
-      avatar: "/tech-girl-avatar.jpg",
-      displayName: "Maya Rodriguez",
-    },
-    image: "/ar-study-space-holographic-books.jpg",
-    caption: "My new study spot has AR books floating everywhere! Perfect for deep focus sessions.",
-    tag: "studyspot",
-    likes: 89,
-    isLiked: true,
-    timestamp: "4h ago",
-    location: "Quantum Library",
-  },
-  {
-    id: 3,
-    user: {
-      username: "zara_wanderer",
-      avatar: "/explorer-avatar.png",
-      displayName: "Zara Kim",
-    },
-    image: "/ar-nature-scene-glowing-forest.jpg",
-    caption: "Nature meets technology in this stunning AR forest. The bioluminescent effects are incredible!",
-    tag: "nature",
-    likes: 203,
-    isLiked: false,
-    timestamp: "6h ago",
-    location: "Digital Wilderness",
+    timestamp: "Just now",
+    location: "AR Location",
   },
 ]
 
 export default function HomePage() {
   const [posts, setPosts] = useState(mockPosts)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadPosts() {
+      setLoading(true)
+      try {
+        const firebasePosts = await fetchPosts()
+        if (firebasePosts.length > 0) {
+          setPosts(firebasePosts)
+        } else {
+          // Keep mock posts if no Firebase data
+          setPosts(mockPosts)
+        }
+      } catch (error) {
+        console.error('Failed to load posts:', error)
+        // Fallback to mock posts
+        setPosts(mockPosts)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadPosts()
+  }, [])
 
   const handleLike = (postId) => {
     setPosts(
@@ -73,31 +136,33 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#2d4a2d] relative overflow-hidden">
+    <div className="min-h-screen bg-[#f0fdf4] relative">
       {/* Background effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#2d4a2d]/20 via-[#4a7c59]/15 to-[#6b9b7a]/25"></div>
-      <div className="scan-line"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f0fdf4]/20 via-[#f0fdf4]/15 to-[#f0fdf4]/25"></div>
 
       {/* Header */}
-      <header className="relative z-10 p-4 border-b border-white/10 backdrop-blur-md bg-black/20">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <h1 className="font-space font-bold text-2xl text-white tracking-wide">glimpse</h1>
-          <Button variant="ghost" size="sm" className="text-white/80 hover:text-white">
-            <MessageCircle className="h-5 w-5" />
-          </Button>
+      <header className="relative z-10 p-4 border-b border-gray-300/20 backdrop-blur-md bg-white/20">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="font-bold text-2xl text-gray-800 tracking-wide text-center">glimpse</h1>
         </div>
       </header>
 
       {/* Feed */}
-      <main className="relative z-10 max-w-md mx-auto pb-20">
-        {posts.map((post) => (
-          <article key={post.id} className="mb-6">
+      <main className="relative z-10 pb-20 px-4 min-h-screen flex flex-col items-center">
+        <div className="w-full max-w-lg">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="text-gray-600">Loading posts...</div>
+            </div>
+          ) : (
+            posts.map((post) => (
+            <article key={post.id} className="mb-6 bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg w-full">
             {/* Post Header */}
             <div className="flex items-center justify-between p-4 pb-3">
               <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10 ring-2 ring-[#4a7c59]/50">
+                <Avatar className="h-10 w-10 ring-2 ring-green-400/50">
                   <AvatarImage src={post.user.avatar || "/placeholder.svg"} alt={post.user.username} />
-                  <AvatarFallback className="bg-[#4a7c59] text-white font-medium">
+                  <AvatarFallback className="bg-green-500 text-white font-medium">
                     {post.user.displayName
                       .split(" ")
                       .map((n) => n[0])
@@ -105,92 +170,82 @@ export default function HomePage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-space font-semibold text-white text-sm">{post.user.username}</p>
-                  <p className="text-white/60 text-xs">
+                  <p className="font-semibold text-gray-800 text-sm">{post.user.username}</p>
+                  <p className="text-gray-600 text-xs">
                     {post.location} • {post.timestamp}
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-800">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </div>
 
             {/* Post Image */}
             <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent z-10 pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent z-10 pointer-events-none"></div>
               <img
                 src={post.image || "/placeholder.svg"}
                 alt="AR Scene"
-                className="w-full aspect-square object-cover"
+                className="w-full aspect-square object-cover rounded-lg"
+                onError={(e) => {
+                  e.target.src = "/placeholder.svg";
+                }}
               />
               {/* Holographic overlay effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[#4a7c59]/20 via-transparent to-[#6b9b7a]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
 
             {/* Post Actions */}
             <div className="flex items-center justify-between p-4 pt-3">
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-6">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleLike(post.id)}
-                  className={`p-0 h-auto ${post.isLiked ? "text-red-400" : "text-white/80"} hover:text-red-400 transition-colors`}
+                  className={`p-2 h-auto ${post.isLiked ? "text-red-500" : "text-gray-600"} hover:text-red-500 transition-colors`}
                 >
-                  <Heart className={`h-6 w-6 ${post.isLiked ? "fill-current" : ""}`} />
+                  <Heart className={`h-8 w-8 ${post.isLiked ? "fill-current" : ""}`} />
                 </Button>
-                <Button variant="ghost" size="sm" className="p-0 h-auto text-white/80 hover:text-white">
-                  <MessageCircle className="h-6 w-6" />
+                <Button variant="ghost" size="sm" className="p-2 h-auto text-gray-600 hover:text-gray-800">
+                  <MessageCircle className="h-8 w-8" />
                 </Button>
-                <Button variant="ghost" size="sm" className="p-0 h-auto text-white/80 hover:text-white">
-                  <Share className="h-6 w-6" />
+                <Button variant="ghost" size="sm" className="p-2 h-auto text-gray-600 hover:text-gray-800">
+                  <Share className="h-8 w-8" />
                 </Button>
               </div>
             </div>
 
             {/* Post Content */}
             <div className="px-4 pb-4">
-              <p className="text-white/90 text-sm mb-2">
+              <p className="text-gray-700 text-sm mb-2">
                 <span className="font-semibold">{post.likes}</span> likes
               </p>
-              <p className="text-white/90 text-sm leading-relaxed mb-2">
-                <span className="font-space font-semibold">{post.user.username}</span> {post.caption}
+              <p className="text-gray-700 text-sm leading-relaxed mb-2">
+                <span className="font-semibold">{post.user.username}</span> {post.caption}
               </p>
               {post.tag && (
                 <Badge
                   variant="secondary"
-                  className="bg-[#4a7c59]/30 text-[#6b9b7a] border border-[#4a7c59]/50 hover:bg-[#4a7c59]/40 text-xs font-medium"
+                  className="bg-green-500/30 text-green-700 border border-green-400/50 hover:bg-green-500/40 text-xs font-medium"
                 >
                   #{post.tag}
                 </Badge>
               )}
             </div>
           </article>
-        ))}
+            ))
+          )}
+        </div>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-black/40 backdrop-blur-md border-t border-white/10">
-        <div className="max-w-md mx-auto flex items-center justify-around py-3">
-          <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-            <div className="w-6 h-6 rounded-full bg-white/20"></div>
-          </Button>
-          <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-            <div className="w-6 h-6 rounded-sm bg-white/20"></div>
-          </Button>
-          <Button variant="ghost" size="sm" className="text-[#4a7c59] hover:text-[#6b9b7a]">
-            <div className="w-8 h-8 rounded-full bg-[#4a7c59] flex items-center justify-center">
-              <div className="w-6 h-6 rounded-full border-2 border-white"></div>
-            </div>
-          </Button>
-          <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-            <Heart className="h-6 w-6" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-            <div className="w-6 h-6 rounded-full bg-white/20"></div>
-          </Button>
-        </div>
-      </nav>
+      {/* Floating Chatbot Button */}
+      <Button
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/25 border-0 z-50"
+        size="lg"
+      >
+        <MessageCircle className="h-6 w-6" />
+      </Button>
     </div>
   )
 }
