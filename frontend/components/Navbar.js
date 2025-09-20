@@ -32,7 +32,7 @@ const Navbar = () => {
   }, []);
 
   // Don't show navbar on the landing page and Instagram page
-  if (pathname === '/' || pathname === '/instagram') {
+  if (pathname === "/" || pathname === "/instagram") {
     return null;
   }
 
@@ -66,7 +66,7 @@ const Navbar = () => {
             Create Post
           </Link>
           <Link
-            href="/feed"
+            href="/home"
             className="px-3 py-2 rounded-lg text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-light transition-colors duration-300 text-lg"
           >
             Feed
