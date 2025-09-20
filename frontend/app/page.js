@@ -1,4 +1,23 @@
+'use client';
+import { useRouter } from 'next/navigation'; // or from 'next/router' in pages router
+import { auth } from '/utils/firebase'; // update path as needed
+import { onAuthStateChanged } from 'firebase/auth';
+
 export default function Page() {
+
+  const router = useRouter();
+
+  const handleLoginClick = () => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push('/home'); // or wherever authenticated users go
+      } else {
+        router.push('/instagram'); // or your login/signup page
+      }
+      unsubscribe(); // prevent memory leaks
+    });
+  };
+
   return (
     <main className="min-h-screen bg-[#2d4a2d]">
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -21,12 +40,12 @@ export default function Page() {
             <p className="font-space font-light text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed drop-shadow-lg mb-16 tracking-wide">
               Capture memories. Share moments. Build connections.
             </p>
-            <a 
-              href="/instagram" 
+            <button
+              onClick={handleLoginClick} 
               className="inline-block px-16 py-5 bg-white/20 hover:bg-white/30 text-white font-space font-medium text-lg rounded-full border border-white/30 hover:border-white/50 transition-all duration-300 backdrop-blur-sm"
             >
               Login
-            </a>
+            </button>
           </div>
         </div>
       </section>
