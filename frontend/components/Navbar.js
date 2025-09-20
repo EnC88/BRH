@@ -1,18 +1,24 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { auth } from '/utils/firebase';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import {
   faBars,
   faClose,
   faPlus,
+  faPerson
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const Navbar = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [hamburgerOpen, setIsHamburgerOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Handle scroll
   useEffect(() => {
@@ -30,6 +36,28 @@ const Navbar = () => {
     resize();
     return () => window.removeEventListener("resize", resize);
   }, []);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await signOut(auth);
+      router.push('/');
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Failed to log out. Please try again.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   // Don't show navbar on the landing page and Instagram page
   if (pathname === "/" || pathname === "/instagram") {
@@ -64,12 +92,24 @@ const Navbar = () => {
               className="text-[#2d4a2d] hover:text-white text-lg transition-colors duration-300"
             />
           </Link>
+
           <Link
             href="/home"
             className="px-4 py-3 rounded-lg text-[#2d4a2d] hover:text-[#4a7c59] hover:bg-green-400/10 font-medium transition-colors duration-300 text-lg"
           >
             Feed
           </Link>
+
+          {/* Logout Button - only show if user is logged in */}
+          {user && (
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="px-4 py-3 rounded-lg text-[#2d4a2d] hover:text-[#4a7c59] hover:bg-green-400/10 font-medium transition-colors duration-300 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </button>
+          )}
         </div>
       </div>
     </nav>

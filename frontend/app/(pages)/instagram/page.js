@@ -44,7 +44,8 @@ export default function Page() {
           email: user.email,
           displayName: user.displayName,
           photos: [],
-          joinedAt: serverTimestamp()
+          joinedAt: serverTimestamp(),
+          photoUrl: user.photoURL
         });
         console.log('✅ New user document created in Firestore.');
       } else {
