@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   faBars,
   faClose,
@@ -9,6 +10,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const Navbar = () => {
+  const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [hamburgerOpen, setIsHamburgerOpen] = useState(false);
 
@@ -28,6 +30,11 @@ const Navbar = () => {
     resize();
     return () => window.removeEventListener("resize", resize);
   }, []);
+
+  // Don't show navbar on the landing page and Instagram page
+  if (pathname === '/' || pathname === '/instagram') {
+    return null;
+  }
 
   return (
     <nav
