@@ -3,6 +3,19 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* BigRed Collections Color Palette */
+  --green-dark: #2d4a2d;
+  --green-medium: #4a7c59;
+  --green-light: #6b9b7a;
+  --green-pale: #9dc2a3;
+  --green-cream: #e8f5e8;
+  --warm-cream: #f5f1e8;
+  --warm-tan: #d4b896;
+  --warm-gold: #b8870b;
+  --black: #1a1a1a;
+  --gray-dark: #4a4a4a;
+  --gray-medium: #8a8a8a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +37,20 @@ body {
 
 .font-instrument {
   font-family: var(--font-instrument-serif), serif;
+}
+
+.hero-video {
+  filter: grayscale(100%) contrast(1.2);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+button:focus,
+a:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }
 
 /* Camera and Photo Rendering Styles */
