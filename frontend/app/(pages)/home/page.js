@@ -394,8 +394,8 @@ Keep it concise (3-5 bullet points) and informative.`;
             </div>
           ) : (
             posts.map((post) => (
-              <div key={post.id} className="flex gap-6 mb-6">
-                <article className="w-1/2 bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg">
+              <div key={post.id} className={`mb-6 ${showMapCard && selectedPostId === post.id ? 'flex gap-4 w-full' : 'w-full max-w-lg mx-auto'}`}>
+                <article className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg ${showMapCard && selectedPostId === post.id ? 'w-1/2' : 'w-full'}`}>
                 <div className="flex items-center justify-between p-4 pb-3">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 ring-2 ring-green-400/50">
