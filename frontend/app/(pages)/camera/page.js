@@ -514,7 +514,7 @@ export default function CameraPage() {
     }
 
     return (
-      <main className="bg-stone-100 p-6 flex justify-center">
+      <main className="bg-white p-6 flex justify-center">
         <div className="max-w-5xl w-full mx-auto flex flex-col items-center">
           <div className="flex justify-between items-center mb-8 w-full">
             <h1 className="text-3xl font-light text-emerald-800">Your Photo</h1>
@@ -646,7 +646,7 @@ export default function CameraPage() {
   }
 
   return (
-    <main className="bg-stone-100 p-6 flex justify-center">
+    <main className="bg-white p-6 flex justify-center">
       <div className="max-w-5xl w-full mx-auto flex flex-col items-center">
         <div className="flex justify-between items-center mb-8 w-full">
           <h1 className="text-3xl font-light text-emerald-800">
@@ -722,6 +722,16 @@ export default function CameraPage() {
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute bottom-8 left-8 w-64 h-64 object-contain pointer-events-none z-20"
+      >
+        <source src="/touchdown_wave.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
     </main>
   );
 }
