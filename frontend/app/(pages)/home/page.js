@@ -80,6 +80,8 @@ async function fetchPosts() {
             caption: postData.description || "",
             category: postData.category || "",
             location: postData.location || "AR Location",
+            latitude: postData.latitude,
+            longitude: postData.longitude,
             tag: postData.tags?.[0] || "general",
             likes: Math.floor(Math.random() * 200) + 10,
             isLiked: false,
@@ -247,13 +249,13 @@ export default function HomePage() {
     setOpenDropdown(openDropdown === postId ? null : postId);
   };
 
-  const handleLocationClick = (location, postId) => {
+  const handleLocationClick = (location, postId, latitude, longitude) => {
     setSelectedLocation(location);
     setSelectedPostId(postId);
     setShowMapCard(true);
     setOpenDropdown(null); // Close any open dropdowns
     setLocationInfo(""); // Clear previous location info
-    generateLocationInfo(location); // Generate new location info
+    generateLocationInfo(location, latitude, longitude); // Generate new location info with coordinates
     
     // Trigger resize event for 3D scenes to recalculate dimensions
     setTimeout(() => {
@@ -273,9 +275,65 @@ export default function HomePage() {
     }, 100);
   };
 
-  const generateLocationInfo = async (location) => {
+  const getPreciseLocation = async (latitude, longitude, fallbackLocation) => {
+    try {
+      // Use Google's reverse geocoding API to get precise location
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch location data");
+      }
+      
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        
+        // Look for specific building names or landmarks
+        const addressComponents = result.address_components || [];
+        
+        // Check for specific building names, points of interest, or establishments
+        const buildingName = addressComponents.find(component => 
+          component.types.includes('establishment') || 
+          component.types.includes('point_of_interest') ||
+          component.types.includes('premise')
+        );
+        
+        if (buildingName) {
+          return buildingName.long_name;
+        }
+        
+        // Check for subpremise (specific building/room)
+        const subpremise = addressComponents.find(component => 
+          component.types.includes('subpremise')
+        );
+        
+        if (subpremise) {
+          return subpremise.long_name;
+        }
+        
+        // Fall back to formatted address if no specific building found
+        return result.formatted_address;
+      }
+      
+      return fallbackLocation;
+    } catch (error) {
+      console.error("Error getting precise location:", error);
+      return fallbackLocation;
+    }
+  };
+
+  const generateLocationInfo = async (location, latitude, longitude) => {
     setIsLoadingLocationInfo(true);
     try {
+      // First, try to get precise location using coordinates
+      let preciseLocation = location;
+      if (latitude && longitude) {
+        preciseLocation = await getPreciseLocation(latitude, longitude, location);
+      }
+
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       
       if (!apiKey) {
@@ -284,8 +342,8 @@ export default function HomePage() {
 
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-      const prompt = `Please provide a brief overview of ${location} in bullet points. Include:
-- What the area is known for
+      const prompt = `Please provide a brief overview of ${preciseLocation} in bullet points. Include:
+- What the area/building is known for
 - Key attractions or landmarks
 - Notable features or characteristics
 - Any interesting facts
@@ -416,7 +474,7 @@ Keep it concise (3-5 bullet points) and informative.`;
                       </p>
                       <p className="text-gray-600 text-xs">
                         <button
-                          onClick={() => handleLocationClick(post.location || "AR Location", post.id)}
+                          onClick={() => handleLocationClick(post.location || "AR Location", post.id, post.latitude, post.longitude)}
                           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                         >
                           {post.location || "AR Location"}
@@ -627,7 +685,13 @@ Keep it concise (3-5 bullet points) and informative.`;
                         {/* Embedded Google Map */}
                         <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-200">
                           <iframe
-                            src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedLocation)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                            src={(() => {
+                              const post = posts.find(p => p.id === selectedPostId);
+                              if (post && post.latitude && post.longitude) {
+                                return `https://maps.google.com/maps?q=${post.latitude},${post.longitude}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+                              }
+                              return `https://maps.google.com/maps?q=${encodeURIComponent(selectedLocation)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+                            })()}
                             width="100%"
                             height="100%"
                             style={{ border: 0 }}
@@ -662,7 +726,14 @@ Keep it concise (3-5 bullet points) and informative.`;
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedLocation)}`, '_blank')}
+                            onClick={() => {
+                              const post = posts.find(p => p.id === selectedPostId);
+                              if (post && post.latitude && post.longitude) {
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${post.latitude},${post.longitude}`, '_blank');
+                              } else {
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedLocation)}`, '_blank');
+                              }
+                            }}
                             className="flex-1"
                           >
                             Open in Maps
