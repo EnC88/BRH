@@ -171,6 +171,9 @@ export default function HomePage() {
   const [allPosts, setAllPosts] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [deletingPost, setDeletingPost] = useState(null);
+  const [showMapCard, setShowMapCard] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [selectedPostId, setSelectedPostId] = useState(null);
 
   const categories = [
     { value: "", label: "All Categories" },
@@ -289,6 +292,19 @@ export default function HomePage() {
     setOpenDropdown(openDropdown === postId ? null : postId);
   };
 
+  const handleLocationClick = (location, postId) => {
+    setSelectedLocation(location);
+    setSelectedPostId(postId);
+    setShowMapCard(true);
+    setOpenDropdown(null); // Close any open dropdowns
+  };
+
+  const closeMapCard = () => {
+    setShowMapCard(false);
+    setSelectedLocation("");
+    setSelectedPostId(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#f0fdf4] relative">
       {/* Background effects */}
@@ -296,7 +312,7 @@ export default function HomePage() {
 
       {/* Feed */}
       <main className="relative z-10 pb-20 px-4 min-h-screen flex flex-col items-center">
-        <div className="w-full max-w-lg">
+        <div className="w-full max-w-6xl">
           {/* Feed Header */}
           <div className="flex items-center justify-between mb-6 pt-6">
             <h1 className="text-2xl font-bold text-[#2d4a2d] tracking-wide">Feed</h1>
@@ -345,10 +361,10 @@ export default function HomePage() {
             </div>
           ) : (
             posts.map((post) => (
-              <article
-                key={post.id}
-                className="mb-6 bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg w-full"
-              >
+              <div key={post.id} className={`mb-6 ${showMapCard && selectedPostId === post.id ? 'flex gap-4 w-full' : 'w-full max-w-lg mx-auto'}`}>
+                <article
+                  className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg ${showMapCard && selectedPostId === post.id ? 'w-1/2' : 'w-full'}`}
+                >
                 {/* Post Header */}
                 <div className="flex items-center justify-between p-4 pb-3">
                   <div className="flex items-center space-x-3">
@@ -369,7 +385,14 @@ export default function HomePage() {
                         {post.user.username}
                       </p>
                       <p className="text-gray-600 text-xs">
-                        {post.location || "AR Location"} • {post.timestamp}
+                        <button
+                          onClick={() => handleLocationClick(post.location || "AR Location", post.id)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {post.location || "AR Location"}
+                        </button>
+                        {" • "}
+                        {post.timestamp}
                       </p>
                     </div>
                   </div>
@@ -470,11 +493,72 @@ export default function HomePage() {
                     )}
                   </div>
                 </div>
-              </article>
+                </article>
+
+                {/* Map Card - only show for the selected post */}
+                {showMapCard && selectedPostId === post.id && (
+                  <div className="w-1/2">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg h-full flex flex-col">
+                      {/* Map Card Header */}
+                      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800">Location Map</h3>
+                        <button
+                          onClick={closeMapCard}
+                          className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      {/* Map Content */}
+                      <div className="flex-1 p-4">
+                        <p className="text-sm text-gray-600 mb-4">
+                          <span className="font-medium">Location:</span> {selectedLocation}
+                        </p>
+                        
+                        {/* Embedded Google Map */}
+                        <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-200">
+                          <iframe
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedLocation)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                            width="100%"
+                            height="100%"
+                            style={{ border: 0 }}
+                            allowFullScreen=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            title={`Map of ${selectedLocation}`}
+                          ></iframe>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="mt-4 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedLocation)}`, '_blank')}
+                            className="flex-1"
+                          >
+                            Open in Maps
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedLocation)}`, '_blank')}
+                            className="flex-1"
+                          >
+                            Search Web
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             ))
           )}
         </div>
       </main>
+
 
       {/* Floating Chatbot Button */}
       <ChatbotPopup />
