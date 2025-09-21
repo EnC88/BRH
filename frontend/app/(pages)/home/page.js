@@ -597,8 +597,6 @@ Keep it concise (3-5 bullet points) and informative.`;
                     imageUrl={post.image || "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Image"}
                     className="rounded-lg"
                   />
-                  {/* Holographic overlay effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>    
                 </div>
                 <div className="flex items-center justify-between p-4 pt-3">
                   <div className="flex items-center space-x-6">
