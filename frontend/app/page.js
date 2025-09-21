@@ -31,7 +31,7 @@ export default function Page() {
           playsInline
           className="absolute inset-0 w-full h-full object-cover opacity-30 hero-video"
         >
-          <source src="/touchdown_wave.mp4" type="video/mp4" />
+          <source src="/Background.mp4" type="video/mp4" />
         </video>
         
         <div className="absolute inset-0 bg-gradient-to-br from-[#2d4a2d]/20 via-[#4a7c59]/15 to-[#6b9b7a]/25"></div>
