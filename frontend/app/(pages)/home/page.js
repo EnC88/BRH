@@ -174,6 +174,8 @@ export default function HomePage() {
   const [showMapCard, setShowMapCard] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedPostId, setSelectedPostId] = useState(null);
+  const [locationInfo, setLocationInfo] = useState("");
+  const [isLoadingLocationInfo, setIsLoadingLocationInfo] = useState(false);
 
   const categories = [
     { value: "", label: "All Categories" },
@@ -297,12 +299,86 @@ export default function HomePage() {
     setSelectedPostId(postId);
     setShowMapCard(true);
     setOpenDropdown(null); // Close any open dropdowns
+    setLocationInfo(""); // Clear previous location info
+    generateLocationInfo(location); // Generate new location info
+    
+    // Trigger resize event for 3D scenes to recalculate dimensions
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
   };
 
   const closeMapCard = () => {
     setShowMapCard(false);
     setSelectedLocation("");
     setSelectedPostId(null);
+    setLocationInfo("");
+    
+    // Trigger resize event for 3D scenes to recalculate dimensions
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+  };
+
+  const generateLocationInfo = async (location) => {
+    setIsLoadingLocationInfo(true);
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error("Gemini API key not found");
+      }
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+      const prompt = `Please provide a brief overview of ${location} in bullet points. Include:
+- What the area is known for
+- Key attractions or landmarks
+- Notable features or characteristics
+- Any interesting facts
+
+Keep it concise (3-5 bullet points) and informative.`;
+
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 300,
+        },
+      };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const locationInfoText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Information not available.";
+      
+      setLocationInfo(locationInfoText);
+    } catch (error) {
+      console.error("Error generating location info:", error);
+      setLocationInfo("Unable to load location information at this time.");
+    } finally {
+      setIsLoadingLocationInfo(false);
+    }
   };
 
   return (
@@ -548,6 +624,25 @@ export default function HomePage() {
                           >
                             Search Web
                           </Button>
+                        </div>
+
+                        {/* Location Information */}
+                        <div className="mt-4">
+                          <h4 className="text-sm font-semibold text-gray-800 mb-2">About {selectedLocation}</h4>
+                          {isLoadingLocationInfo ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                              Loading location information...
+                            </div>
+                          ) : locationInfo ? (
+                            <div className="text-sm text-gray-700 whitespace-pre-line">
+                              {locationInfo}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">
+                              Click to load location information
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
