@@ -400,7 +400,7 @@ Keep it concise (3-5 bullet points) and informative.`;
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 ring-2 ring-green-400/50">
                       <AvatarImage
-                        src={post.user.avatar || "/placeholder.svg"}
+                        src={post.user.avatar || "https://via.placeholder.com/150/4a7c59/ffffff?text=User"}
                         alt={post.user.username}
                       />
                       <AvatarFallback className="bg-green-500 text-white font-medium">
