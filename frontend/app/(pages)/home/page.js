@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import ChatbotPopup from "@/components/ChatbotPopup";
+import Post3DScene from "@/components/Post3DScene";
 import {
   getFirestore,
   collection,
@@ -77,6 +78,8 @@ async function fetchPosts() {
             },
             image: postData.url,
             caption: postData.description || "",
+            category: postData.category || "",
+            location: postData.location || "AR Location",
             tag: postData.tags?.[0] || "general",
             likes: Math.floor(Math.random() * 200) + 10,
             isLiked: false,
@@ -412,7 +415,14 @@ Keep it concise (3-5 bullet points) and informative.`;
                         {post.user.username}
                       </p>
                       <p className="text-gray-600 text-xs">
-                        {post.location} • {formatTimestamp(post.timestamp)}
+                        <button
+                          onClick={() => handleLocationClick(post.location || "AR Location", post.id)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {post.location || "AR Location"}
+                        </button>
+                        {" • "}
+                        {formatTimestamp(post.timestamp)}
                       </p>
                     </div>
                   </div>
@@ -424,15 +434,14 @@ Keep it concise (3-5 bullet points) and informative.`;
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="relative group">
-                  <img
-                    src={post.image || "/placeholder.svg"}
-                    alt="AR Scene"
-                    className="w-full aspect-square object-cover"
-                    onError={(e) => {
-                      e.target.src = "/placeholder.svg";
-                    }}
+                {/* Post 3D Scene */}
+                <div className="relative group rounded-lg overflow-hidden">
+                  <Post3DScene 
+                    imageUrl={post.image || "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Image"}
+                    className="rounded-lg"
                   />
+                  {/* Holographic overlay effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>    
                 </div>
                 <div className="flex items-center justify-between p-4 pt-3">
                   <div className="flex items-center space-x-6">
@@ -465,16 +474,6 @@ Keep it concise (3-5 bullet points) and informative.`;
                     >
                       <Share className="h-8 w-8" />
                     </Button>
-                    {post.location && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-2 h-auto text-gray-600 hover:text-gray-800"
-                        onClick={() => handleLocationClick(post.location, post.id)}
-                      >
-                        📍
-                      </Button>
-                    )}
                   </div>
                 </div>
                 <div className="px-4 pb-4">
