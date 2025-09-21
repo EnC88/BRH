@@ -1,15 +1,8 @@
 [
   {
-    "origin": [
-      "http://localhost:3000", 
-      "http://localhost:3001", 
-      "https://brh-xi.vercel.app",
-      "https://brh-git-main-enc88s-projects.vercel.app",
-      "https://brh2025-*.vercel.app",
-      "https://*.vercel.app"
-    ],
-    "method": ["GET"],
-    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+    "origin": ["*"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers"],
     "maxAgeSeconds": 3600
   }
 ]
