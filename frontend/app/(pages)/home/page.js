@@ -1,26 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Heart, MessageCircle, Share, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  Share,
+  MoreHorizontal,
+  Send,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import ChatbotPopup from "@/components/ChatbotPopup";
-import Post3DScene from "@/components/Post3DScene";
 import {
   getFirestore,
   collection,
   getDocs,
   query,
-  orderBy,
-  limit,
   doc,
   updateDoc,
-  arrayRemove,
+  getDoc,
 } from "firebase/firestore";
-import { getStorage, ref, deleteObject } from "firebase/storage";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -36,10 +38,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 // Function to format timestamp
 function formatTimestamp(timestamp) {
+  if (!timestamp) return "some time ago";
   const now = new Date();
   const postTime = new Date(timestamp);
   const diffInHours = Math.floor((now - postTime) / (1000 * 60 * 60));
@@ -61,7 +63,7 @@ async function fetchPosts() {
     snapshot.forEach((doc) => {
       const userData = doc.data();
       if (userData.posts && Array.isArray(userData.posts)) {
-        userData.posts.forEach((post, index) => {
+        userData.posts.forEach((postData, index) => {
           allPosts.push({
             id: `${doc.id}_${index}`,
             userId: doc.id,
@@ -69,103 +71,54 @@ async function fetchPosts() {
             user: {
               username:
                 userData.displayName || userData.email?.split("@")[0] || "User",
-              avatar: userData.avatar || "https://via.placeholder.com/150/4a7c59/ffffff?text=User",
+              avatar:
+                userData.photoUrl || userData.avatar || "/placeholder.svg",
               displayName: userData.displayName || "User",
             },
-            image: post.url,
-            caption: post.description || "",
-            category: post.category || "",
-            location: post.location || "AR Location",
-            tag: post.tags?.[0] || "general",
-            likes: Math.floor(Math.random() * 200) + 10, // Random likes for now
+            image: postData.url,
+            caption: postData.description || "",
+            tag: postData.tags?.[0] || "general",
+            likes: Math.floor(Math.random() * 200) + 10,
             isLiked: false,
-            timestamp: formatTimestamp(post.timestamp),
-            originalTimestamp: post.timestamp,
-            filename: post.filename,
-            originalPost: post, // Store the original post data for deletion
+            timestamp: postData.timestamp, // Keep raw timestamp for sorting
+            comments: postData.comments || [],
           });
         });
       }
     });
 
-    // Sort by timestamp (newest first) - use the original timestamp from Firebase
-    return allPosts.sort((a, b) => {
-      // Get the original timestamp from the post data
-      const timestampA = a.originalTimestamp || a.timestamp;
-      const timestampB = b.originalTimestamp || b.timestamp;
-      return new Date(timestampB) - new Date(timestampA);
-    });
+    // Sort by the raw timestamp descending
+    return allPosts.sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
   } catch (error) {
     console.error("Error fetching posts:", error);
     return [];
   }
 }
 
-// Function to delete image from Firebase Storage
-async function deleteImageFromStorage(filename) {
-  try {
-    if (!filename) {
-      console.warn("No filename provided for deletion");
-      return;
-    }
-    
-    const imageRef = ref(storage, `uploads/${filename}`);
-    await deleteObject(imageRef);
-    console.log("Image deleted from storage:", filename);
-  } catch (error) {
-    console.error("Error deleting image from storage:", error);
-    // Don't throw error here as the image might already be deleted
-  }
-}
-
-// Function to delete post from Firebase
-async function deletePost(post) {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    // Delete the image from storage first
-    if (post.filename) {
-      await deleteImageFromStorage(post.filename);
-    }
-
-    // Remove the post from Firestore
-    const userDocRef = doc(db, "users", post.userId);
-    await updateDoc(userDocRef, {
-      posts: arrayRemove(post.originalPost)
-    });
-
-    console.log("Post deleted successfully");
-    return true;
-  } catch (error) {
-    console.error("Error deleting post:", error);
-    throw error;
-  }
-}
-
-// Mock data for posts (fallback - only used if no Firebase data)
+// Mock data for posts (fallback)
 const mockPosts = [
   {
     id: 1,
     user: {
       username: "demo_user",
-      avatar: "https://via.placeholder.com/150/4a7c59/ffffff?text=User",
+      avatar: "/placeholder.svg",
       displayName: "Demo User",
     },
-    image: "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Posts+Yet",
+    image: "/placeholder.svg",
     caption: "No posts yet. Upload your first AR photo to get started!",
     tag: "welcome",
     likes: 0,
     isLiked: false,
-    timestamp: "Just now",
+    timestamp: new Date().toISOString(),
     location: "AR Location",
+    comments: [],
   },
 ];
 
 export default function HomePage() {
-  const [posts, setPosts] = useState(mockPosts);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [allPosts, setAllPosts] = useState([]);
@@ -176,6 +129,9 @@ export default function HomePage() {
   const [selectedPostId, setSelectedPostId] = useState(null);
   const [locationInfo, setLocationInfo] = useState("");
   const [isLoadingLocationInfo, setIsLoadingLocationInfo] = useState(false);
+  const [expandedComments, setExpandedComments] = useState({});
+  const [newComments, setNewComments] = useState({});
+  const [submittingComment, setSubmittingComment] = useState({});
 
   const categories = [
     { value: "", label: "All Categories" },
@@ -192,65 +148,16 @@ export default function HomePage() {
       setLoading(true);
       try {
         const firebasePosts = await fetchPosts();
-        if (firebasePosts.length > 0) {
-          setAllPosts(firebasePosts);
-          setPosts(firebasePosts);
-        } else {
-          // Keep mock posts if no Firebase data
-          setAllPosts(mockPosts);
-          setPosts(mockPosts);
-        }
+        setPosts(firebasePosts.length > 0 ? firebasePosts : mockPosts);
       } catch (error) {
         console.error("Failed to load posts:", error);
-        // Fallback to mock posts
-        setAllPosts(mockPosts);
         setPosts(mockPosts);
       } finally {
         setLoading(false);
       }
     }
-
     loadPosts();
-
-    // Refresh posts when page becomes visible (e.g., returning from camera)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadPosts();
-      }
-    };
-
-    // Also refresh when window gains focus
-    const handleFocus = () => {
-      loadPosts();
-    };
-
-    // Close dropdown when clicking outside
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.dropdown-container')) {
-        setOpenDropdown(null);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('click', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('click', handleClickOutside);
-    };
   }, []);
-
-  // Filter posts based on selected category
-  useEffect(() => {
-    if (selectedCategory === "") {
-      setPosts(allPosts);
-    } else {
-      const filteredPosts = allPosts.filter(post => post.category === selectedCategory);
-      setPosts(filteredPosts);
-    }
-  }, [selectedCategory, allPosts]);
 
   const handleLike = (postId) => {
     setPosts(
@@ -266,27 +173,70 @@ export default function HomePage() {
     );
   };
 
-  const handleDeletePost = async (post) => {
-    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+  // Toggles the visibility of the comment section
+  const toggleComments = (postId) => {
+    setExpandedComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
+  const handleCommentChange = (postId, value) => {
+    setNewComments((prev) => ({ ...prev, [postId]: value }));
+  };
+
+  const submitComment = async (postId) => {
+    const commentText = newComments[postId];
+    if (!commentText?.trim() || submittingComment[postId]) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Please sign in to comment");
       return;
     }
 
-    setDeletingPost(post.id);
-    setOpenDropdown(null);
+    setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
 
     try {
-      await deletePost(post);
-      
-      // Remove the post from local state
-      setPosts(posts.filter(p => p.id !== post.id));
-      setAllPosts(allPosts.filter(p => p.id !== post.id));
-      
-      alert("Post deleted successfully!");
+      const post = posts.find((p) => p.id === postId);
+      if (!post) return;
+
+      const newComment = {
+        id: Date.now().toString(),
+        userId: user.uid,
+        username: user.displayName || user.email?.split("@")[0] || "User",
+        avatar: user.photoURL || "/placeholder.svg",
+        text: commentText.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      const userRef = doc(db, "users", post.userId);
+      const userDoc = await getDoc(userRef);
+
+      if (userDoc.exists()) {
+        const currentPosts = userDoc.data().posts || [];
+        const updatedPosts = [...currentPosts];
+
+        if (updatedPosts[post.postIndex]) {
+          updatedPosts[post.postIndex] = {
+            ...updatedPosts[post.postIndex],
+            comments: [
+              ...(updatedPosts[post.postIndex].comments || []),
+              newComment,
+            ],
+          };
+          await updateDoc(userRef, { posts: updatedPosts });
+        }
+      }
+
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p
+        )
+      );
+      setNewComments((prev) => ({ ...prev, [postId]: "" }));
     } catch (error) {
-      console.error("Failed to delete post:", error);
-      alert(`Failed to delete post: ${error.message}`);
+      console.error("Error submitting comment:", error);
+      alert("Failed to submit comment. Please try again.");
     } finally {
-      setDeletingPost(null);
+      setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
     }
   };
 
@@ -381,12 +331,16 @@ Keep it concise (3-5 bullet points) and informative.`;
     }
   };
 
+  const handleCommentKeyPress = (e, postId) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitComment(postId);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f0fdf4] relative">
-      {/* Background effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#f0fdf4]/20 via-[#f0fdf4]/15 to-[#f0fdf4]/25"></div>
-
-      {/* Feed */}
       <main className="relative z-10 pb-20 px-4 min-h-screen flex flex-col items-center">
         <div className="w-full max-w-6xl">
           {/* Feed Header */}
@@ -396,8 +350,8 @@ Keep it concise (3-5 bullet points) and informative.`;
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-[#2d4a2d]/30 rounded-lg 
-                           text-[#2d4a2d] font-medium focus:outline-none focus:ring-2 focus:ring-green-400 
+                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-[#2d4a2d]/30 rounded-lg
+                           text-[#2d4a2d] font-medium focus:outline-none focus:ring-2 focus:ring-green-400
                            cursor-pointer appearance-none pr-8 text-sm truncate"
               >
                 {categories.map((category) => (
@@ -437,16 +391,13 @@ Keep it concise (3-5 bullet points) and informative.`;
             </div>
           ) : (
             posts.map((post) => (
-              <div key={post.id} className={`mb-6 ${showMapCard && selectedPostId === post.id ? 'flex gap-4 w-full' : 'w-full max-w-lg mx-auto'}`}>
-                <article
-                  className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg ${showMapCard && selectedPostId === post.id ? 'w-1/2' : 'w-full'}`}
-                >
-                {/* Post Header */}
+              <div key={post.id} className="flex gap-6 mb-6">
+                <article className="w-1/2 bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg">
                 <div className="flex items-center justify-between p-4 pb-3">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 ring-2 ring-green-400/50">
                       <AvatarImage
-                        src={post.user.avatar || "https://via.placeholder.com/150/4a7c59/ffffff?text=User"}
+                        src={post.user.avatar || "/placeholder.svg"}
                         alt={post.user.username}
                       />
                       <AvatarFallback className="bg-green-500 text-white font-medium">
@@ -461,53 +412,28 @@ Keep it concise (3-5 bullet points) and informative.`;
                         {post.user.username}
                       </p>
                       <p className="text-gray-600 text-xs">
-                        <button
-                          onClick={() => handleLocationClick(post.location || "AR Location", post.id)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                        >
-                          {post.location || "AR Location"}
-                        </button>
-                        {" • "}
-                        {post.timestamp}
+                        {post.location} • {formatTimestamp(post.timestamp)}
                       </p>
                     </div>
                   </div>
-                  <div className="relative dropdown-container">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-600 hover:text-gray-800"
-                      onClick={() => toggleDropdown(post.id)}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                    
-                    {openDropdown === post.id && (
-                      <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
-                        <button
-                          onClick={() => handleDeletePost(post)}
-                          disabled={deletingPost === post.id}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          {deletingPost === post.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-800"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
                 </div>
-
-                {/* Post 3D Scene */}
-                <div className="relative group rounded-lg overflow-hidden">
-                  <Post3DScene 
-                    imageUrl={post.image || "https://via.placeholder.com/400/4a7c59/ffffff?text=No+Image"}
-                    className="rounded-lg"
+                <div className="relative group">
+                  <img
+                    src={post.image || "/placeholder.svg"}
+                    alt="AR Scene"
+                    className="w-full aspect-square object-cover"
+                    onError={(e) => {
+                      e.target.src = "/placeholder.svg";
+                    }}
                   />
-                  {/* Holographic overlay effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 via-transparent to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                 </div>
-
-                {/* Post Actions */}
                 <div className="flex items-center justify-between p-4 pt-3">
                   <div className="flex items-center space-x-6">
                     <Button
@@ -528,6 +454,7 @@ Keep it concise (3-5 bullet points) and informative.`;
                       variant="ghost"
                       size="sm"
                       className="p-2 h-auto text-gray-600 hover:text-gray-800"
+                      onClick={() => toggleComments(post.id)}
                     >
                       <MessageCircle className="h-8 w-8" />
                     </Button>
@@ -538,10 +465,18 @@ Keep it concise (3-5 bullet points) and informative.`;
                     >
                       <Share className="h-8 w-8" />
                     </Button>
+                    {post.location && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-2 h-auto text-gray-600 hover:text-gray-800"
+                        onClick={() => handleLocationClick(post.location, post.id)}
+                      >
+                        📍
+                      </Button>
+                    )}
                   </div>
                 </div>
-
-                {/* Post Content */}
                 <div className="px-4 pb-4">
                   <p className="text-gray-700 text-sm mb-2">
                     <span className="font-semibold">{post.likes}</span> likes
@@ -568,6 +503,104 @@ Keep it concise (3-5 bullet points) and informative.`;
                       </Badge>
                     )}
                   </div>
+
+                  {/* Comments section */}
+
+                  {/* A text prompt that shows when comments are collapsed */}
+                  {!expandedComments[post.id] && post.comments.length > 0 && (
+                    <p
+                      className="text-sm text-gray-500 mt-2 cursor-pointer"
+                      onClick={() => toggleComments(post.id)}
+                    >
+                      View all {post.comments.length} comments
+                    </p>
+                  )}
+
+                  {/* This entire section only appears when comments are expanded */}
+                  {expandedComments[post.id] && (
+                    <div className="border-t border-gray-200 pt-3 mt-3">
+                      {/* Scrollable container for the list of comments */}
+                      <div className="max-h-48 overflow-y-auto pr-2 space-y-3 mb-3">
+                        {post.comments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="flex items-start space-x-2"
+                          >
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage
+                                src={comment.avatar}
+                                alt={comment.username}
+                              />
+                              <AvatarFallback className="bg-gray-400 text-white text-xs">
+                                {comment.username[0]?.toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="text-sm">
+                                <span className="font-semibold text-gray-800">
+                                  {comment.username}
+                                </span>{" "}
+                                <span className="text-gray-700">
+                                  {comment.text}
+                                </span>
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatTimestamp(comment.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Add comment input field */}
+                      <div className="flex items-center space-x-2 pt-2 border-t border-gray-100">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage
+                            src={
+                              auth.currentUser?.photoURL || "/placeholder.svg"
+                            }
+                            alt="You"
+                          />
+                          <AvatarFallback className="bg-green-500 text-white text-xs">
+                            {auth.currentUser?.displayName?.[0]?.toUpperCase() ||
+                              "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 flex items-center space-x-2">
+                          <input
+                            type="text"
+                            placeholder="Add a comment..."
+                            value={newComments[post.id] || ""}
+                            onChange={(e) =>
+                              handleCommentChange(post.id, e.target.value)
+                            }
+                            onKeyPress={(e) =>
+                              handleCommentKeyPress(e, post.id)
+                            }
+                            className="flex-1 bg-transparent text-sm placeholder-gray-500 focus:outline-none"
+                            disabled={submittingComment[post.id]}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => submitComment(post.id)}
+                            disabled={
+                              !newComments[post.id]?.trim() ||
+                              submittingComment[post.id]
+                            }
+                            className="p-1 h-auto text-green-600 hover:text-green-700 disabled:opacity-50"
+                          >
+                            {submittingComment[post.id] ? (
+                              <div className="w-4 h-4 border-2 border-green-600/30 border-t-green-600 rounded-full animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
                 </div>
                 </article>
 
@@ -606,6 +639,25 @@ Keep it concise (3-5 bullet points) and informative.`;
                           ></iframe>
                         </div>
 
+                        {/* Location Information */}
+                        <div className="mt-4">
+                          <h4 className="text-sm font-semibold text-gray-800 mb-2">About {selectedLocation}</h4>
+                          {isLoadingLocationInfo ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                              Loading location information...
+                            </div>
+                          ) : locationInfo ? (
+                            <div className="text-sm text-gray-700 whitespace-pre-line">
+                              {locationInfo}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">
+                              Click to load location information
+                            </div>
+                          )}
+                        </div>
+
                         {/* Action Buttons */}
                         <div className="mt-4 flex gap-2">
                           <Button
@@ -625,25 +677,6 @@ Keep it concise (3-5 bullet points) and informative.`;
                             Search Web
                           </Button>
                         </div>
-
-                        {/* Location Information */}
-                        <div className="mt-4">
-                          <h4 className="text-sm font-semibold text-gray-800 mb-2">About {selectedLocation}</h4>
-                          {isLoadingLocationInfo ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                              Loading location information...
-                            </div>
-                          ) : locationInfo ? (
-                            <div className="text-sm text-gray-700 whitespace-pre-line">
-                              {locationInfo}
-                            </div>
-                          ) : (
-                            <div className="text-sm text-gray-500">
-                              Click to load location information
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -653,16 +686,7 @@ Keep it concise (3-5 bullet points) and informative.`;
           )}
         </div>
       </main>
-
-
-      {/* Floating Chatbot Button */}
       <ChatbotPopup />
-      {/* <Button
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/25 border-0 z-50"
-        size="lg"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </Button> */}
     </div>
   );
 }
