@@ -1,6 +1,12 @@
 [
   {
-    "origin": ["http://localhost:3000", "http://localhost:3001", "https://yourdomain.com"],
+    "origin": [
+      "http://localhost:3000", 
+      "http://localhost:3001", 
+      "https://brh-xi.vercel.app",
+      "https://brh-*.vercel.app",
+      "https://brh2025-*.vercel.app"
+    ],
     "method": ["GET"],
     "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
     "maxAgeSeconds": 3600
