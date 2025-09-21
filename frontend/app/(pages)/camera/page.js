@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import Background3D from "../../../components/Background3D";
 import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
@@ -371,6 +372,7 @@ export default function CameraPage() {
     window.location.href = "/camera";
   };
 
+
   const createScene = async (container, photoDataUrl) => {
     container.innerHTML = "";
     try {
@@ -485,6 +487,7 @@ export default function CameraPage() {
       }, 100);
     }
   }, [show3DScene, capturedPhoto]);
+
 
   if (isLoading3D) {
     return (
@@ -722,16 +725,7 @@ export default function CameraPage() {
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="absolute bottom-8 left-8 w-64 h-64 object-contain pointer-events-none z-20"
-      >
-        <source src="/touchdown_wave.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
+      <Background3D />
     </main>
   );
 }
