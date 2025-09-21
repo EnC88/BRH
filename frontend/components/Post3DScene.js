@@ -57,6 +57,17 @@ const Post3DScene = ({ imageUrl, className = "" }) => {
       return;
     }
 
+    // Test if the URL is accessible before trying to load as texture
+    const testUrlAccessibility = async (url) => {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+      } catch (error) {
+        console.log("Post3DScene: URL accessibility test failed:", url, error);
+        return false;
+      }
+    };
+
     // Load texture and create 3D plane function
     const loadTextureAs3D = (scene, url) => {
       const loader = new THREE.TextureLoader();
@@ -118,7 +129,12 @@ const Post3DScene = ({ imageUrl, className = "" }) => {
 
           scene.background = new THREE.Color(0x1a4d3a);
         } catch (error) {
-          console.error("Error creating 3D scene:", error);
+          console.error("Error creating 3D scene:", {
+            error: error || 'No error object provided',
+            errorType: typeof error,
+            errorMessage: error?.message || error?.toString() || 'Unknown error',
+            errorStack: error?.stack || 'No stack trace available'
+          });
           setIsLoading(false);
           setHasError(true);
           // Fallback: create a simple colored plane
@@ -131,11 +147,11 @@ const Post3DScene = ({ imageUrl, className = "" }) => {
       },
         (error) => {
           console.error("Post3DScene: Error loading texture:", {
-            error,
+            error: error || 'No error object provided',
             imageUrl: url,
             errorType: typeof error,
-            errorMessage: error?.message || 'Unknown error',
-            errorStack: error?.stack
+            errorMessage: error?.message || error?.toString() || 'Unknown error',
+            errorStack: error?.stack || 'No stack trace available'
           });
           setIsLoading(false);
           setHasError(true);
@@ -145,32 +161,51 @@ const Post3DScene = ({ imageUrl, className = "" }) => {
       );
     };
 
-    // For Firebase Storage URLs, we can now load them directly as textures (after CORS setup)
-    const isFirebaseUrl = imageUrl.includes('firebasestorage.googleapis.com');
-    
-    if (isFirebaseUrl) {
-      console.log("Post3DScene: Firebase URL detected, loading directly as texture");
-      // For Firebase URLs, load directly as texture (CORS should be configured)
-      loadTextureAs3D(scene, imageUrl);
-    } else {
-      // Test if image is accessible before loading as texture (for non-Firebase URLs)
-      const testImage = new Image();
-      testImage.crossOrigin = 'anonymous';
+    // Test URL accessibility first, then load texture
+    const initializeScene = async () => {
+      const isFirebaseUrl = imageUrl.includes('firebasestorage.googleapis.com');
       
-      testImage.onload = () => {
-        console.log("Post3DScene: Image test successful, loading as texture");
-        loadTextureAs3D(scene, imageUrl);
-      };
-      
-      testImage.onerror = (error) => {
-        console.error("Post3DScene: Image test failed:", error);
-        setIsLoading(false);
-        setHasError(true);
-        createFallbackScene(scene);
-      };
-      
-      testImage.src = imageUrl;
-    }
+      if (isFirebaseUrl) {
+        console.log("Post3DScene: Firebase URL detected, testing accessibility");
+        const isAccessible = await testUrlAccessibility(imageUrl);
+        
+        if (isAccessible) {
+          console.log("Post3DScene: Firebase URL is accessible, loading as texture");
+          loadTextureAs3D(scene, imageUrl);
+        } else {
+          console.log("Post3DScene: Firebase URL is not accessible (404 or other error), creating fallback scene");
+          setIsLoading(false);
+          setHasError(true);
+          createFallbackScene(scene);
+        }
+      } else {
+        // Test if image is accessible before loading as texture (for non-Firebase URLs)
+        const testImage = new Image();
+        testImage.crossOrigin = 'anonymous';
+        
+        testImage.onload = () => {
+          console.log("Post3DScene: Image test successful, loading as texture");
+          loadTextureAs3D(scene, imageUrl);
+        };
+        
+        testImage.onerror = (error) => {
+          console.error("Post3DScene: Image test failed:", {
+            error: error || 'No error object provided',
+            imageUrl: imageUrl,
+            errorType: typeof error,
+            errorMessage: error?.message || error?.toString() || 'Image load failed'
+          });
+          setIsLoading(false);
+          setHasError(true);
+          createFallbackScene(scene);
+        };
+        
+        testImage.src = imageUrl;
+      }
+    };
+
+    // Initialize the scene
+    initializeScene();
 
     // Fallback function for when texture loading fails
     const createFallbackScene = (scene) => {
@@ -205,7 +240,12 @@ const Post3DScene = ({ imageUrl, className = "" }) => {
 
         scene.background = new THREE.Color(0x1a4d3a);
       } catch (fallbackError) {
-        console.error("Error creating fallback scene:", fallbackError);
+        console.error("Error creating fallback scene:", {
+          error: fallbackError || 'No error object provided',
+          errorType: typeof fallbackError,
+          errorMessage: fallbackError?.message || fallbackError?.toString() || 'Unknown error',
+          errorStack: fallbackError?.stack || 'No stack trace available'
+        });
         setIsLoading(false);
         setHasError(true);
       }

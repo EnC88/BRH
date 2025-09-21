@@ -1,18 +1,21 @@
 'use client';
-import { useRouter } from 'next/navigation'; // or from 'next/router' in pages router
-import { auth } from '/utils/firebase'; // update path as needed
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { auth } from '@/utils/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function Page() {
-
   const router = useRouter();
 
   const handleLoginClick = () => {
+    // Check if user is already logged in
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        router.push('/home'); // or wherever authenticated users go
+        // User is already logged in, go directly to home
+        router.push('/home');
       } else {
-        router.push('/instagram'); // or your login/signup page
+        // User is not logged in, go to login page
+        router.push('/instagram');
       }
       unsubscribe(); // prevent memory leaks
     });

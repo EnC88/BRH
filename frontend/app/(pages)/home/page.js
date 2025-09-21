@@ -11,12 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import ChatbotPopup from "@/components/ChatbotPopup";
 import Post3DScene from "@/components/Post3DScene";
+import { auth, db } from "@/utils/firebase";
 import {
-  getFirestore,
   collection,
   getDocs,
   query,
@@ -24,21 +22,6 @@ import {
   updateDoc,
   getDoc,
 } from "firebase/firestore";
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
-  authDomain: "brh2025-4b271.firebaseapp.com",
-  projectId: "brh2025-4b271",
-  storageBucket: "brh2025-4b271.firebasestorage.app",
-  messagingSenderId: "858895632224",
-  appId: "1:858895632224:web:3c09a5d9b77c9da0438005",
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 // Function to format timestamp
 function formatTimestamp(timestamp) {

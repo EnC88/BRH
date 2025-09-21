@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import Background3D from "../../../components/Background3D";
-import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getAuth } from "firebase/auth";
-import { getFirestore, doc, updateDoc, arrayUnion } from "firebase/firestore";
+import { auth, db } from "@/utils/firebase";
+import { doc, updateDoc, arrayUnion } from "firebase/firestore";
 
 export default function CameraPage() {
   const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -22,19 +21,7 @@ export default function CameraPage() {
   const [cameraError, setCameraError] = useState(null);
   const [permissionRequested, setPermissionRequested] = useState(false);
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyC8ejbYGF1vVC7ErSJ3G5YFGB0DmF1Mt3M",
-    authDomain: "brh2025-4b271.firebaseapp.com",
-    projectId: "brh2025-4b271",
-    storageBucket: "brh2025-4b271.firebasestorage.app",
-    messagingSenderId: "858895632224",
-    appId: "1:858895632224:web:3c09a5d9b77c9da0438005",
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const storage = getStorage(app);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+  const storage = getStorage();
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);

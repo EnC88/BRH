@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { auth } from '/utils/firebase';
+import { auth } from '@/utils/firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import {
   faBars,

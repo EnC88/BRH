@@ -8,7 +8,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "/utils/firebase"; // Import from the new file
+import { auth, db } from "@/utils/firebase";
 
 export default function Page() {
   const [userStatus, setUserStatus] = useState("Not signed in");
