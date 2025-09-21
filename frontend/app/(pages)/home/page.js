@@ -119,22 +119,19 @@ async function fetchPosts() {
     const snapshot = await getDocs(usersRef);
     const allPosts = [];
 
+    // First, collect all posts with basic data
     for (const doc of snapshot.docs) {
       const userData = doc.data();
       if (userData.posts && Array.isArray(userData.posts)) {
         for (let index = 0; index < userData.posts.length; index++) {
           const postData = userData.posts[index];
           
-          // Get precise location name if coordinates are available
-          let displayLocation = postData.location || "AR Location";
-          if (postData.latitude && postData.longitude) {
-            displayLocation = await getPreciseLocationName(
-              postData.latitude, 
-              postData.longitude, 
-              postData.location || "AR Location"
-            );
-          }
-
+          
+          // Filter out #camera tags and get the first non-camera tag
+          const filteredTags = postData.tags?.filter(tag => 
+            tag && !tag.toLowerCase().includes('camera') && !tag.includes('#camera')
+          ) || [];
+          
           allPosts.push({
             id: `${doc.id}_${index}`,
             userId: doc.id,
@@ -149,10 +146,10 @@ async function fetchPosts() {
             image: postData.url,
             caption: postData.description || "",
             category: postData.category || "",
-            location: displayLocation, // Use the precise location name
+            location: postData.location || "AR Location", // Use original location for now
             latitude: postData.latitude,
             longitude: postData.longitude,
-            tag: postData.tags?.[0] || "general",
+            tag: filteredTags[0] || "general",
             likes: Math.floor(Math.random() * 200) + 10,
             isLiked: false,
             timestamp: postData.timestamp, // Keep raw timestamp for sorting
@@ -161,11 +158,43 @@ async function fetchPosts() {
         }
       }
     }
+    
 
-    // Sort by the raw timestamp descending
-    return allPosts.sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    // Sort by the raw timestamp descending FIRST
+    const sortedPosts = allPosts.sort((a, b) => {
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
+      
+      // Handle invalid dates
+      if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
+      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+    });
+
+    // Then process location names asynchronously (this won't affect sorting)
+    const postsWithPreciseLocations = await Promise.all(
+      sortedPosts.map(async (post) => {
+        if (post.latitude && post.longitude) {
+          try {
+            const preciseLocation = await getPreciseLocationName(
+              post.latitude, 
+              post.longitude, 
+              post.location
+            );
+            return { ...post, location: preciseLocation };
+          } catch (error) {
+            console.error("Error getting precise location:", error);
+            return post; // Return original post if location lookup fails
+          }
+        }
+        return post;
+      })
     );
+
+    console.log('Final posts being returned:', postsWithPreciseLocations.map(p => ({ id: p.id, timestamp: p.timestamp })));
+    return postsWithPreciseLocations;
   } catch (error) {
     console.error("Error fetching posts:", error);
     return [];
@@ -456,6 +485,12 @@ Keep it concise (3-5 bullet points) and informative.`;
     }
   };
 
+  // Filter posts based on selected category
+  const filteredPosts = posts.filter(post => {
+    if (!selectedCategory) return true; // Show all posts if no category selected
+    return post.category === selectedCategory;
+  });
+
   return (
     <div className="min-h-screen bg-[#f0fdf4] relative">
       <div className="absolute inset-0 bg-gradient-to-br from-[#f0fdf4]/20 via-[#f0fdf4]/15 to-[#f0fdf4]/25"></div>
@@ -507,8 +542,15 @@ Keep it concise (3-5 bullet points) and informative.`;
             <div className="flex justify-center items-center py-20">
               <div className="text-gray-600">Loading posts...</div>
             </div>
+          ) : filteredPosts.length === 0 ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="text-gray-600 text-center">
+                <p className="text-lg font-medium mb-2">No posts found</p>
+                <p className="text-sm">No posts match the selected category "{categories.find(cat => cat.value === selectedCategory)?.label || selectedCategory}"</p>
+              </div>
+            </div>
           ) : (
-            posts.map((post) => (
+            filteredPosts.map((post) => (
               <div key={post.id} className={`mb-6 ${showMapCard && selectedPostId === post.id ? 'flex gap-4 w-full' : 'w-full max-w-lg mx-auto'}`}>
                 <article className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg ${showMapCard && selectedPostId === post.id ? 'w-1/2' : 'w-full'}`}>
                 <div className="flex items-center justify-between p-4 pb-3">
@@ -743,7 +785,7 @@ Keep it concise (3-5 bullet points) and informative.`;
                         <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-200">
                           <iframe
                             src={(() => {
-                              const post = posts.find(p => p.id === selectedPostId);
+                              const post = filteredPosts.find(p => p.id === selectedPostId);
                               if (post && post.latitude && post.longitude) {
                                 return `https://maps.google.com/maps?q=${post.latitude},${post.longitude}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
                               }
@@ -804,7 +846,7 @@ Keep it concise (3-5 bullet points) and informative.`;
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const post = posts.find(p => p.id === selectedPostId);
+                              const post = filteredPosts.find(p => p.id === selectedPostId);
                               if (post && post.latitude && post.longitude) {
                                 window.open(`https://www.google.com/maps/search/?api=1&query=${post.latitude},${post.longitude}`, '_blank');
                               } else {
