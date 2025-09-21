@@ -54,6 +54,64 @@ function formatTimestamp(timestamp) {
   return postTime.toLocaleDateString();
 }
 
+// Function to get precise location name from coordinates
+async function getPreciseLocationName(latitude, longitude, fallbackLocation) {
+  try {
+    if (!latitude || !longitude) {
+      return fallbackLocation;
+    }
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    );
+    
+    if (!response.ok) {
+      return fallbackLocation;
+    }
+    
+    const data = await response.json();
+    
+    if (data.results && data.results.length > 0) {
+      const result = data.results[0];
+      const addressComponents = result.address_components || [];
+      
+      // Look for specific building names, points of interest, or establishments
+      const buildingName = addressComponents.find(component => 
+        component.types.includes('establishment') || 
+        component.types.includes('point_of_interest') ||
+        component.types.includes('premise')
+      );
+      
+      if (buildingName) {
+        return buildingName.long_name;
+      }
+      
+      // Check for subpremise (specific building/room)
+      const subpremise = addressComponents.find(component => 
+        component.types.includes('subpremise')
+      );
+      
+      if (subpremise) {
+        return subpremise.long_name;
+      }
+      
+      // Check for route (street name) as a fallback
+      const route = addressComponents.find(component => 
+        component.types.includes('route')
+      );
+      
+      if (route) {
+        return route.long_name;
+      }
+    }
+    
+    return fallbackLocation;
+  } catch (error) {
+    console.error("Error getting precise location name:", error);
+    return fallbackLocation;
+  }
+}
+
 // Function to fetch posts from Firebase
 async function fetchPosts() {
   try {
@@ -61,10 +119,22 @@ async function fetchPosts() {
     const snapshot = await getDocs(usersRef);
     const allPosts = [];
 
-    snapshot.forEach((doc) => {
+    for (const doc of snapshot.docs) {
       const userData = doc.data();
       if (userData.posts && Array.isArray(userData.posts)) {
-        userData.posts.forEach((postData, index) => {
+        for (let index = 0; index < userData.posts.length; index++) {
+          const postData = userData.posts[index];
+          
+          // Get precise location name if coordinates are available
+          let displayLocation = postData.location || "AR Location";
+          if (postData.latitude && postData.longitude) {
+            displayLocation = await getPreciseLocationName(
+              postData.latitude, 
+              postData.longitude, 
+              postData.location || "AR Location"
+            );
+          }
+
           allPosts.push({
             id: `${doc.id}_${index}`,
             userId: doc.id,
@@ -79,7 +149,7 @@ async function fetchPosts() {
             image: postData.url,
             caption: postData.description || "",
             category: postData.category || "",
-            location: postData.location || "AR Location",
+            location: displayLocation, // Use the precise location name
             latitude: postData.latitude,
             longitude: postData.longitude,
             tag: postData.tags?.[0] || "general",
@@ -88,9 +158,9 @@ async function fetchPosts() {
             timestamp: postData.timestamp, // Keep raw timestamp for sorting
             comments: postData.comments || [],
           });
-        });
+        }
       }
-    });
+    }
 
     // Sort by the raw timestamp descending
     return allPosts.sort(
@@ -275,54 +345,39 @@ export default function HomePage() {
     }, 100);
   };
 
-  const getPreciseLocation = async (latitude, longitude, fallbackLocation) => {
-    try {
-      // Use Google's reverse geocoding API to get precise location
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-      );
+
+  // Function to format Gemini output for better display
+  const formatLocationInfo = (text) => {
+    if (!text) return "Information not available.";
+    
+    // Split by lines and process each line
+    const lines = text.split('\n').filter(line => line.trim());
+    const formattedLines = lines.map(line => {
+      // Remove markdown formatting
+      let cleanLine = line
+        .replace(/\*\*(.*?)\*\*/g, '$1') 
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/^\*\s*/, '• ')
+        .replace(/^-\s*/, '• ')
+        .trim();
       
-      if (!response.ok) {
-        throw new Error("Failed to fetch location data");
+      // If line starts with a colon, it's likely a category header
+      if (cleanLine.includes(':')) {
+        const [category, content] = cleanLine.split(':', 2);
+        return {
+          type: 'category',
+          category: category.trim(),
+          content: content.trim()
+        };
       }
       
-      const data = await response.json();
-      
-      if (data.results && data.results.length > 0) {
-        const result = data.results[0];
-        
-        // Look for specific building names or landmarks
-        const addressComponents = result.address_components || [];
-        
-        // Check for specific building names, points of interest, or establishments
-        const buildingName = addressComponents.find(component => 
-          component.types.includes('establishment') || 
-          component.types.includes('point_of_interest') ||
-          component.types.includes('premise')
-        );
-        
-        if (buildingName) {
-          return buildingName.long_name;
-        }
-        
-        // Check for subpremise (specific building/room)
-        const subpremise = addressComponents.find(component => 
-          component.types.includes('subpremise')
-        );
-        
-        if (subpremise) {
-          return subpremise.long_name;
-        }
-        
-        // Fall back to formatted address if no specific building found
-        return result.formatted_address;
-      }
-      
-      return fallbackLocation;
-    } catch (error) {
-      console.error("Error getting precise location:", error);
-      return fallbackLocation;
-    }
+      return {
+        type: 'bullet',
+        content: cleanLine
+      };
+    });
+    
+    return formattedLines;
   };
 
   const generateLocationInfo = async (location, latitude, longitude) => {
@@ -331,7 +386,7 @@ export default function HomePage() {
       // First, try to get precise location using coordinates
       let preciseLocation = location;
       if (latitude && longitude) {
-        preciseLocation = await getPreciseLocation(latitude, longitude, location);
+        preciseLocation = await getPreciseLocationName(latitude, longitude, location);
       }
 
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -383,7 +438,9 @@ Keep it concise (3-5 bullet points) and informative.`;
       const data = await response.json();
       const locationInfoText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Information not available.";
       
-      setLocationInfo(locationInfoText);
+      // Format the response for better display
+      const formattedInfo = formatLocationInfo(locationInfoText);
+      setLocationInfo(formattedInfo);
     } catch (error) {
       console.error("Error generating location info:", error);
       setLocationInfo("Unable to load location information at this time.");
@@ -711,8 +768,28 @@ Keep it concise (3-5 bullet points) and informative.`;
                               Loading location information...
                             </div>
                           ) : locationInfo ? (
-                            <div className="text-sm text-gray-700 whitespace-pre-line">
-                              {locationInfo}
+                            <div className="text-sm text-gray-700">
+                              {Array.isArray(locationInfo) ? (
+                                <div className="space-y-2">
+                                  {locationInfo.map((item, index) => (
+                                    <div key={index}>
+                                      {item.type === 'category' ? (
+                                        <div>
+                                          <span className="font-semibold text-gray-800">{item.category}:</span>
+                                          <span className="ml-1">{item.content}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-start">
+                                          <span className="text-green-600 mr-2">•</span>
+                                          <span>{item.content}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-line">{locationInfo}</div>
+                              )}
                             </div>
                           ) : (
                             <div className="text-sm text-gray-500">
